@@ -1,0 +1,19 @@
+#version 140
+
+in vec4 MCvertex;
+in vec4 MCvertexColor;
+
+uniform mat4 MVMatrix;
+uniform mat4 PMatrix;
+
+out vec3 vColor;
+out float vAlpha;
+
+void main(void)
+{
+	gl_PointSize = 3;
+	vColor = MCvertexColor.rgb;
+	vAlpha = MCvertexColor.a;
+	
+    gl_Position = PMatrix * MVMatrix * MCvertex;
+}
