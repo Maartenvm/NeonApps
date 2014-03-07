@@ -16,7 +16,7 @@ public class DataReader implements Runnable {
     private final float OFFSET_Z = 110;
     private final float SCALE = 0.01f;
 
-    private final int SKIP_POINTS = 10;
+    private final int SKIP_POINTS = 0;
 
     private FloatBuffer vertices;
     private FloatBuffer colors;
@@ -61,17 +61,19 @@ public class DataReader implements Runnable {
             ArrayList<Float> lons = new ArrayList<Float>();
             ArrayList<Float> hgts = new ArrayList<Float>();
 
+            float hgtTotal = 0f;
+
             while ((sCurrentLine = br.readLine()) != null) {
                 if (count == 0) {
                     String[] splitLine = sCurrentLine.trim().split("\\s+");
 
                     try {
-                        float lat = (Float.parseFloat(splitLine[0]) - OFFSET_X) * SCALE;
-                        float lon = (Float.parseFloat(splitLine[1]) - OFFSET_Y) * SCALE;
-                        float hgt = (Float.parseFloat(splitLine[2]) - OFFSET_Z) * SCALE;
-                        float r = Float.parseFloat(splitLine[3]) / 255f;
-                        float g = Float.parseFloat(splitLine[4]) / 255f;
-                        float b = Float.parseFloat(splitLine[5]) / 255f;
+                        float lat = (float) (Double.parseDouble(splitLine[0]) - OFFSET_X) * SCALE;
+                        float lon = (float) (Double.parseDouble(splitLine[1]) - OFFSET_Y) * SCALE;
+                        float hgt = (float) (Double.parseDouble(splitLine[2]) - OFFSET_Z) * SCALE;
+                        float r = Integer.parseInt(splitLine[3]) / 255f;
+                        float g = Integer.parseInt(splitLine[4]) / 255f;
+                        float b = Integer.parseInt(splitLine[5]) / 255f;
 
                         lats.add(lat);
                         lons.add(lon);
@@ -105,6 +107,9 @@ public class DataReader implements Runnable {
                         if (hgt < lowHgt) {
                             lowHgt = hgt;
                         }
+
+                        hgtTotal += hgt;
+
                     } catch (NumberFormatException e) {
                         // System.out.println(splitLine[10]);
                         // ignore this entry
@@ -119,10 +124,24 @@ public class DataReader implements Runnable {
             float lonDiff = highLon - lowLon;
             float hgtDiff = highHgt - lowHgt;
 
+            float maxDiff = latDiff;
+            if (lonDiff > maxDiff) {
+                maxDiff = lonDiff;
+            }
+            if (hgtDiff > maxDiff) {
+                maxDiff = hgtDiff;
+            }
+
+            float hgtAverage = hgtTotal / hgts.size();
+
+            System.out.println("Hight MIN: " + lowHgt);
+            System.out.println("Hight MAX: " + highHgt);
+            System.out.println("Hight AVG: " + hgtAverage);
+
             for (int i = 0; i < lats.size(); i++) {
-                float lat = (lats.get(i) / highLat) - 0.5f;
-                float lon = (lons.get(i) / highLon) - 0.5f;
-                float hgt = (hgts.get(i) / highHgt) - 0.5f;
+                float lat = ((lats.get(i) - lowLat) / maxDiff) - 0.5f;
+                float lon = ((lons.get(i) - lowLon) / maxDiff) - 0.5f;
+                float hgt = hgts.get(i) - hgtAverage;
 
                 tmpVertices.put(lat);
                 tmpVertices.put(lon);
@@ -178,7 +197,7 @@ public class DataReader implements Runnable {
         int tally = 0;
         File dataFile;
         for (int sequenceNumber = 12; sequenceNumber < 13; sequenceNumber++) {
-            dataFile = new File("/home/maarten/pcl_install/datasets/ViaAppia/Rome-000"
+            dataFile = new File("/media/maarten/diskhdd1/Via Appia/Via Appia rit2/Rome-000"
                     + String.format("%03d", sequenceNumber) + ".las.txt");
             if (dataFile != null && dataFile.exists()) {
                 System.out.println("Scanning:" + dataFile.getAbsolutePath());

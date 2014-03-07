@@ -9,7 +9,10 @@ import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLContext;
 
 import nl.esciencecenter.neon.NeonGLEventListener;
+import nl.esciencecenter.neon.datastructures.FrameBufferObject;
 import nl.esciencecenter.neon.datastructures.IntPixelBufferObject;
+import nl.esciencecenter.neon.examples.viaAppia.las.LASFile;
+import nl.esciencecenter.neon.examples.viaAppia.las.LASPointCloudModel;
 import nl.esciencecenter.neon.exceptions.InverseNotAvailableException;
 import nl.esciencecenter.neon.exceptions.UninitializedException;
 import nl.esciencecenter.neon.input.InputHandler;
@@ -17,11 +20,12 @@ import nl.esciencecenter.neon.math.Float3Vector;
 import nl.esciencecenter.neon.math.Float4Matrix;
 import nl.esciencecenter.neon.math.Float4Vector;
 import nl.esciencecenter.neon.math.FloatMatrixMath;
+import nl.esciencecenter.neon.math.FloatVectorMath;
 import nl.esciencecenter.neon.math.Point4;
 import nl.esciencecenter.neon.models.Axis;
+import nl.esciencecenter.neon.models.GeoSphere;
 import nl.esciencecenter.neon.models.Model;
 import nl.esciencecenter.neon.models.Sphere;
-import nl.esciencecenter.neon.models.graphs.ScatterPlot3D;
 import nl.esciencecenter.neon.shaders.ShaderProgram;
 
 import org.slf4j.Logger;
@@ -53,14 +57,15 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     private final static Logger LOGGER = LoggerFactory.getLogger(ViaAppiaGLEventListener.class);
 
     // Two example shader program definitions.
-    private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram;
+    private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram;
 
     // Model definitions, the quad is necessary for Full-screen rendering. The
     // axes are the model we wish to render (example)
     private Model xAxis, yAxis, zAxis;
 
-    private ScatBuilder scatBuilder;
-    private ScatterPlot3D scat;
+    // private ScatBuilder scatBuilder;
+    // private ScatterPlot3D scat;
+    private LASPointCloudModel pcModel;
 
     // Global (singleton) settings instance.
     private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
@@ -90,6 +95,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     private Float3Vector clickTranslation = new Float3Vector();
 
     private Sphere clickSphere;
+
+    private GeoSphere globe;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -168,6 +175,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             // Do the same for the line shader
             lineShaderProgram = getLoader().createProgram(gl, "line", new File("shaders/vs_lineShader.vp"),
                     new File("shaders/fs_lineShader.fp"));
+            // Do the same for the PointCloud shader
+            pointCloudShaderProgram = getLoader().createProgram(gl, "lasFile", new File("shaders/vs_lasFileShader.vp"),
+                    new File("shaders/fs_lasFileShader.fp"));
 
             // Same for the postprocessing shader.
             // postprocessShader = getLoader().createProgram(gl, "postProcess",
@@ -197,8 +207,24 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         clickSphere = new Sphere(2, false);
         clickSphere.init(gl);
 
-        scatBuilder = new ScatBuilder();
-        new Thread(scatBuilder).start();
+        globe = new GeoSphere(20, 20, 1, false);
+        globe.init(gl);
+
+        File dataFile;
+        for (int sequenceNumber = 12; sequenceNumber < 13; sequenceNumber++) {
+            dataFile = new File("/media/maarten/diskhdd1/Via Appia/Via Appia rit2/Rome-000"
+                    + String.format("%03d", sequenceNumber) + ".las");
+            if (dataFile != null && dataFile.exists()) {
+                LASFile lasFile = new LASFile(dataFile);
+                pcModel = new LASPointCloudModel(lasFile);
+                pcModel.init(gl);
+            }
+        }
+
+        System.out.println("init complete");
+
+        // scatBuilder = new ScatBuilder();
+        // new Thread(scatBuilder).start();
 
         // Release the context.
         contextOff(drawable);
@@ -259,32 +285,42 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
                 // gl.glFinish();
                 // gl.glPixelStorei(GL3.GL_UNPACK_ALIGNMENT, 1);
 
-                FloatBuffer data = FloatBuffer.allocate(1);
-                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_DEPTH_COMPONENT, GL3.GL_FLOAT, data);
-                float mouseZ = data.get();
+                FloatBuffer depthData = FloatBuffer.allocate(1);
+                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_DEPTH_COMPONENT, GL3.GL_FLOAT, depthData);
+                float mouseZ = depthData.get();
 
-                Float3Vector pickResultNear = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                        new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 0f));
-                System.out.println("Pick result near: " + pickResultNear);
-
-                Float3Vector pickResultFar = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                        new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 1f));
-                System.out.println("Pick result far: " + pickResultFar);
-
-                Float3Vector pickRay = pickResultFar.sub(pickResultNear);
-                System.out.println("Pick ray: " + pickRay);
-
-                Float3Vector pickResultZ = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                        new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, mouseZ));
-                System.out.println("Pick result Z: " + pickResultZ);
-
-                data = FloatBuffer.allocate(4);
+                FloatBuffer colorData = FloatBuffer.allocate(4);
                 gl.glReadBuffer(GL3.GL_FRONT);
-                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_RGBA, GL3.GL_FLOAT, data);
+                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_RGBA, GL3.GL_FLOAT, colorData);
 
-                System.out.println("Color: " + data.get(0) + " " + data.get(1) + " " + data.get(2) + " " + data.get(3));
+                // System.out.println("Color: " + data.get(0) + " " +
+                // data.get(1) + " " + data.get(2) + " "
+                // + data.get(3));
 
-                clickTranslation = pickResultZ;
+                // System.out.println("Click : " + mouseX + "/" + mouseY);
+
+                if (FloatVectorMath.length(new Float3Vector(colorData.get(0), colorData.get(1), colorData.get(2))) > 0f) {
+
+                    Float3Vector pickResultNear = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 0f));
+                    // System.out.println("Pick result near: " +
+                    // pickResultNear);
+
+                    Float3Vector pickResultFar = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 1f));
+                    // System.out.println("Pick result far: " + pickResultFar);
+
+                    Float3Vector pickRay = pickResultFar.sub(pickResultNear);
+                    float distance = pointToVectorDistance(new Float4Vector(0f, 0f, 0f, 1f), pickResultNear,
+                            pickResultFar);
+                    System.out.println("Pick ray: " + pickRay + " Distance to origin: " + distance);
+
+                    Float3Vector pickResultZ = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, mouseZ));
+                    // System.out.println("Pick result Z: " + pickResultZ);
+
+                    clickTranslation = pickResultZ;
+                }
 
             } catch (InverseNotAvailableException e) {
                 e.printStackTrace();
@@ -317,6 +353,21 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         contextOff(drawable);
     }
 
+    private float pointToVectorDistance(Float4Vector point, Float3Vector a, Float3Vector b) {
+        float distance = Float.MAX_VALUE;
+
+        Float3Vector lineDirection = FloatVectorMath.normalize(b.sub(a));
+        Float3Vector pointDirection = point.stripAlpha().sub(a);
+
+        float t = FloatVectorMath.dot(pointDirection, lineDirection);
+
+        Float3Vector projection = a.add(lineDirection.mul(t));
+
+        distance = FloatVectorMath.length((projection.sub(point.stripAlpha())));
+
+        return distance;
+    }
+
     private Float4Matrix makePerspectiveMatrix() {
         return FloatMatrixMath.perspective(getFovy(), getAspect(), getzNear(), getzFar());
     }
@@ -332,11 +383,57 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
      */
     private void renderScene(GL3 gl, Float4Matrix mv) {
         try {
-            renderScatterplot(gl, textShaderProgram);
+            // renderScatterplot(gl, mv, textShaderProgram);
+            renderAxes(gl, new Float4Matrix(mv), axesShaderProgram);
+            renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderProgram);
+
+            // drawGlobe(gl, lineShaderProgram);
 
         } catch (final UninitializedException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Axes rendering method. This assumes rendering to an
+     * {@link FrameBufferObject}. This is not a necessity, but it allows for
+     * post processing.
+     * 
+     * @param gl
+     *            The current openGL instance.
+     * @param mv
+     *            The current modelview matrix.
+     * @param target
+     *            The {@link ShaderProgram} to use for rendering.
+     * @param target
+     *            The target {@link FrameBufferObject} to render to.
+     * @throws UninitializedException
+     *             if either the shader Program or FrameBufferObject used in
+     *             this method are uninitialized before use.
+     */
+    private void renderAxes(GL3 gl, Float4Matrix mv, ShaderProgram program) throws UninitializedException {
+        // Stage the Perspective and Modelview matrixes in the ShaderProgram.
+        program.setUniformMatrix("PMatrix", makePerspectiveMatrix());
+        program.setUniformMatrix("MVMatrix", mv);
+
+        // Stage the Color vector in the ShaderProgram.
+        program.setUniformVector("Color", new Float4Vector(1f, 0f, 0f, 1f));
+
+        // Load all staged variables into the GPU, check for errors and
+        // omissions.
+        program.use(gl);
+        // Call the model's draw method, this links the model's VertexBuffer to
+        // the ShaderProgram and then calls the OpenGL draw method.
+        xAxis.draw(gl, program);
+
+        // Do this 2 more times, with different colors and models.
+        program.setUniformVector("Color", new Float4Vector(0f, 1f, 0f, 1f));
+        program.use(gl);
+        yAxis.draw(gl, program);
+
+        program.setUniformVector("Color", new Float4Vector(0f, 0f, 1f, 1f));
+        program.use(gl);
+        zAxis.draw(gl, program);
     }
 
     private void drawClickSphere(GL3 gl, ShaderProgram program, Float3Vector center) throws UninitializedException {
@@ -361,7 +458,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationZ(inputHandler.getRotation().getZ()));
 
         // modelViewMatrix =
-        // modelViewMatrix.mul(FloatMatrixMath.translate(center.neg()));
+        // modelViewMatrix.mul(modelViewMatrix.mul(FloatMatrixMath.translate(center.neg())));
         modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.scale(0.01f));
 
         program.setUniformMatrix("MVMatrix", modelViewMatrix);
@@ -377,6 +474,26 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         clickSphere.draw(gl, program);
     }
 
+    private void drawGlobe(GL3 gl, ShaderProgram program) throws UninitializedException {
+        Float4Matrix modelViewMatrix = FloatMatrixMath.lookAt(eye, at, up);
+
+        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.translate(new Float3Vector(inputHandler.getTranslation()
+                .getX(), inputHandler.getTranslation().getY(), inputHandler.getViewDist())));
+
+        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationX(inputHandler.getRotation().getX()));
+        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationY(inputHandler.getRotation().getY()));
+        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationZ(inputHandler.getRotation().getZ()));
+
+        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.scale(1f));
+
+        program.setUniformMatrix("PMatrix", makePerspectiveMatrix());
+        program.setUniformMatrix("MVMatrix", modelViewMatrix);
+        program.setUniformVector("Color", new Float4Vector(0f, 0f, 1f, 0.1f));
+
+        program.use(gl);
+        globe.draw(gl, program);
+    }
+
     /**
      * Renders the scatterplot.
      * 
@@ -388,30 +505,28 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
      *            The {@link ShaderProgram} to use for rendering.
      * @throws UninitializedException
      */
-    private void renderScatterplot(GL3 gl, ShaderProgram program) throws UninitializedException {
+    private void renderScatterplot(GL3 gl, Float4Matrix mv, ShaderProgram program) throws UninitializedException {
         // Stage the Perspective and Modelview matrixes in the ShaderProgram.
         program.setUniformMatrix("PMatrix", makePerspectiveMatrix());
 
         // Construct a modelview matrix out of camera viewpoint and angle.
-        Float4Matrix modelViewMatrix = FloatMatrixMath.lookAt(eye, at, up);
+        // Float4Matrix modelViewMatrix = FloatMatrixMath.lookAt(eye, at, up);
 
         // Translate the camera backwards according to the inputhandler's view
         // distance setting.
         // modelViewMatrix =
         // modelViewMatrix.mul(FloatMatrixMath.translate(clickTranslation));
+        // Float4Matrix modelViewMatrix =
+        // modelViewMatrix.mul(FloatMatrixMath.translate(new
+        // Float3Vector(inputHandler.getTranslation()
+        // .getX(), inputHandler.getTranslation().getY(),
+        // inputHandler.getViewDist())));
 
-        Float4Matrix translationMatrix = FloatMatrixMath.translate(new Float3Vector(inputHandler.getTranslation()
-                .getX(), inputHandler.getTranslation().getY(), inputHandler.getViewDist()));
+        Float4Matrix objectRotationMatrix = FloatMatrixMath.rotationX(-90f);
 
-        modelViewMatrix = modelViewMatrix.mul(translationMatrix);
+        mv = mv.mul(objectRotationMatrix);
 
-        // Rotate tha camera according to the rotation angles defined in the
-        // inputhandler.
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationX(inputHandler.getRotation().getX()));
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationY(inputHandler.getRotation().getY()));
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationZ(inputHandler.getRotation().getZ()));
-
-        program.setUniformMatrix("MVMatrix", modelViewMatrix);
+        program.setUniformMatrix("MVMatrix", mv);
         // mv.mul(FloatMatrixMath.translate(-0.5f, 0,
         // 4.5f)).mul(FloatMatrixMath.rotationX(-90)));
 
@@ -419,10 +534,21 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         // omissions.
         program.use(gl);
 
-        scat = scatBuilder.getScatterPlot(gl);
-        if (scat != null) {
-            scat.draw(gl, program);
-        }
+        // scat = scatBuilder.getScatterPlot(gl);
+        // if (scat != null) {
+        // scat.draw(gl, program);
+        // }
+    }
+
+    public void renderPointCloud(GL3 gl, Float4Matrix mv, ShaderProgram program) throws UninitializedException {
+        program.setUniformMatrix("PMatrix", makePerspectiveMatrix());
+
+        Float4Matrix objectRotationMatrix = FloatMatrixMath.rotationX(-90f);
+        mv = mv.mul(objectRotationMatrix);
+        program.setUniformMatrix("MVMatrix", mv);
+        // program.use(gl);
+
+        pcModel.draw(gl, program);
     }
 
     // The reshape method is automatically called by the openGL animator if the

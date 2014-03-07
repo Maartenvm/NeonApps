@@ -15,8 +15,8 @@ public class MatrixFMathExt {
 
         // System.out.println("VP   : " + viewPort[0] + ", " + viewPort[1] +
         // ", " + viewPort[2] + ", " + viewPort[3]);
-        // System.out.println("Click: " + mouseCoords.getX() + ", " +
-        // mouseCoords.getY() + ", " + mouseCoords.getZ());
+        System.out.println("-------------------------------------------------------------");
+        System.out.println("Click: " + mouseCoords.getX() + ", " + mouseCoords.getY() + ", " + mouseCoords.getZ());
 
         Float4Matrix mult = modelView.mul(projection);
 

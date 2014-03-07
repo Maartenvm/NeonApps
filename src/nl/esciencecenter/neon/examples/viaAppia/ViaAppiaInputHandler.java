@@ -178,7 +178,7 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
 
         if (e.isShiftDown()) {
             float wheelRotation = e.getRotation()[0];
-            newViewDist -= wheelRotation * .5;
+            newViewDist -= wheelRotation * .05;
         } else {
             float wheelRotation = e.getRotation()[1];
             newViewDist -= wheelRotation * 2;
