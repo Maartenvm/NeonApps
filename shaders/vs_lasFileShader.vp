@@ -1,0 +1,39 @@
+#version 400
+
+in vec3 MCvertex;
+in vec3 MCvertexColor;
+
+out vec4 vertexColor;
+
+uniform mat4 PMatrix;
+uniform mat4 MVMatrix;
+
+uniform double scaleFactorX;
+uniform double scaleFactorY;
+uniform double scaleFactorZ;
+uniform double offsetX;
+uniform double offsetY;
+uniform double offsetZ;
+uniform double minX;
+uniform double minY;
+uniform double minZ;
+uniform double diffX;
+
+void main() {
+	gl_PointSize = 3;
+	
+    //float processedX = float((((((MCvertex.x * scaleFactorX) + offsetX) - minX) / diffX) - 0.5) * 2.0);
+    //float processedY = float((((((MCvertex.y * scaleFactorY) + offsetY) - minY) / diffX) - 0.5) * 2.0);
+    //float processedZ = float(((((MCvertex.z * scaleFactorZ) + offsetZ) - minZ) / diffX) * 2.0);
+
+    float processedR = float(MCvertexColor.r / 255.0);
+    float processedG = float(MCvertexColor.g / 255.0);
+    float processedB = float(MCvertexColor.b / 255.0);
+		
+	vertexColor = vec4(processedR, processedG, processedB, 1.0);
+	
+	//vec4 vertexPos = vec4(processedX, processedY, processedZ, 1.0);
+    //gl_Position = PMatrix * MVMatrix * vertexPos;
+        
+    gl_Position = PMatrix * MVMatrix * vec4(MCvertex.xyz,1.0);
+}

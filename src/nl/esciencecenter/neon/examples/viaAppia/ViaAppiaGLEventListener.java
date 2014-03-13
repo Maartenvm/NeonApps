@@ -1,7 +1,8 @@
 package nl.esciencecenter.neon.examples.viaAppia;
 
 import java.io.File;
-import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.media.opengl.GL;
 import javax.media.opengl.GL3;
@@ -11,9 +12,10 @@ import javax.media.opengl.GLContext;
 import nl.esciencecenter.neon.NeonGLEventListener;
 import nl.esciencecenter.neon.datastructures.FrameBufferObject;
 import nl.esciencecenter.neon.datastructures.IntPixelBufferObject;
+import nl.esciencecenter.neon.examples.viaAppia.las.BoundingBox;
 import nl.esciencecenter.neon.examples.viaAppia.las.LASFile;
 import nl.esciencecenter.neon.examples.viaAppia.las.LASPointCloudModel;
-import nl.esciencecenter.neon.exceptions.InverseNotAvailableException;
+import nl.esciencecenter.neon.examples.viaAppia.las.LASPublicHeader;
 import nl.esciencecenter.neon.exceptions.UninitializedException;
 import nl.esciencecenter.neon.input.InputHandler;
 import nl.esciencecenter.neon.math.Float3Vector;
@@ -65,7 +67,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
     // private ScatBuilder scatBuilder;
     // private ScatterPlot3D scat;
-    private LASPointCloudModel pcModel;
+    private List<LASPointCloudModel> pcModel;
 
     // Global (singleton) settings instance.
     private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
@@ -92,11 +94,13 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     final Point4 at = new Point4(0.0f, 0.0f, 0.0f);
     final Float4Vector up = new Float4Vector(0.0f, 1.0f, 0.0f, 0.0f);
 
-    private Float3Vector clickTranslation = new Float3Vector();
+    private final Float3Vector clickTranslation = new Float3Vector();
 
     private Sphere clickSphere;
 
     private GeoSphere globe;
+
+    int filesToLoad = 105;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -105,6 +109,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         super();
 
     }
+
+    // int cachedFileNumber = inputHandler.getFileNumber();
 
     // Initialization method, this is called by the animator before anything
     // else, and is therefore the perfect place to initialize all of the
@@ -210,15 +216,64 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         globe = new GeoSphere(20, 20, 1, false);
         globe.init(gl);
 
+        pcModel = new ArrayList<LASPointCloudModel>();
+
+        double minMinX = Double.MAX_VALUE;
+        double minMinY = Double.MAX_VALUE;
+        double minMinZ = Double.MAX_VALUE;
+
+        double maxMaxX = Double.MIN_VALUE;
+        double maxMaxY = Double.MIN_VALUE;
+        double maxMaxZ = Double.MIN_VALUE;
+
+        BoundingBox overallBoundingBox = new BoundingBox(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
+
         File dataFile;
-        for (int sequenceNumber = 12; sequenceNumber < 13; sequenceNumber++) {
-            dataFile = new File("/media/maarten/diskhdd1/Via Appia/Via Appia rit2/Rome-000"
-                    + String.format("%03d", sequenceNumber) + ".las");
+        for (int sequenceNumber = 1; sequenceNumber < filesToLoad; sequenceNumber++) {
+            // cachedFileNumber = inputHandler.getFileNumber();
+            dataFile = new File("/media/maarten/diskhdd2/Via Appia/Rome-000" + String.format("%03d", sequenceNumber)
+                    + ".las");
             if (dataFile != null && dataFile.exists()) {
-                LASFile lasFile = new LASFile(dataFile);
-                pcModel = new LASPointCloudModel(lasFile);
-                pcModel.init(gl);
+                LASFile lasFile = new LASFile(dataFile, 10);
+
+                LASPublicHeader header = lasFile.getPublicHeader();
+                double minX = header.getMinX();
+                if (minX < minMinX) {
+                    minMinX = minX;
+                }
+                double minY = header.getMinY();
+                if (minY < minMinY) {
+                    minMinY = minY;
+                }
+                double minZ = header.getMinZ();
+                if (minZ < minMinZ) {
+                    minMinZ = minZ;
+                }
+                double maxX = header.getMaxX();
+                if (maxX > maxMaxX) {
+                    maxMaxX = maxX;
+                }
+                double maxY = header.getMaxY();
+                if (maxY > maxMaxY) {
+                    maxMaxY = maxY;
+                }
+                double maxZ = header.getMaxZ();
+                if (maxZ > maxMaxZ) {
+                    maxMaxZ = maxZ;
+                }
+
+                LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox);
+                pcModel.add(currentModel);
             }
+        }
+
+        overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
+
+        for (LASPointCloudModel currentModel : pcModel) {
+            // LASPointDataRecord record = currentModel.getRecord();
+
+            currentModel.init(gl);// , minMinX, maxMaxX, minMinY, maxMaxY,
+                                  // minMinZ, maxMaxZ);
         }
 
         System.out.println("init complete");
@@ -253,93 +308,112 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
         // Construct a modelview matrix out of camera viewpoint and angle.
-        Float4Matrix modelViewMatrix = FloatMatrixMath.lookAt(eye, at, up);
+        // Float4Matrix modelViewMatrix = FloatMatrixMath.lookAt(eye, at, up);
+        Float4Matrix modelViewMatrix = inputHandler.getModelview();
 
         // Translate the camera backwards according to the inputhandler's view
         // distance setting.
         // modelViewMatrix =
         // modelViewMatrix.mul(FloatMatrixMath.translate(clickTranslation));
 
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.translate(new Float3Vector(inputHandler.getTranslation()
-                .getX(), inputHandler.getTranslation().getY(), inputHandler.getViewDist())));
+        // modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.translate(0f,
+        // 0f, inputHandler.getViewDist()));
+        //
+        // modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.translate(new
+        // Float3Vector(inputHandler.getTranslation()
+        // .getX(), inputHandler.getTranslation().getY(), 0f)));
 
         // Rotate tha camera according to the rotation angles defined in the
         // inputhandler.
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationX(inputHandler.getRotation().getX()));
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationY(inputHandler.getRotation().getY()));
-        modelViewMatrix = modelViewMatrix.mul(FloatMatrixMath.rotationZ(inputHandler.getRotation().getZ()));
+        // modelViewMatrix =
+        // modelViewMatrix.mul(FloatMatrixMath.rotationX(inputHandler.getRotation().getX()));
+        // modelViewMatrix =
+        // modelViewMatrix.mul(FloatMatrixMath.rotationY(inputHandler.getRotation().getY()));
+        // modelViewMatrix =
+        // modelViewMatrix.mul(FloatMatrixMath.rotationZ(inputHandler.getRotation().getZ()));
 
         // Render the scene with these modelview settings. In this case, the end
         // result of this action will be that the AxesFBO has been filled with
         // the right pixels.
         renderScene(gl, modelViewMatrix);
 
-        ViaAppiaInputHandler.PickRequest pr = ViaAppiaInputHandler.doPick();
+        // ViaAppiaInputHandler.PickRequest pr = ViaAppiaInputHandler.doPick();
+        // ViaAppiaInputHandler.PickRequest pr = null;
+        // if (pr != null) {
+        // try {
+        // int mouseX = pr.x;
+        // int mouseY = canvasHeight - pr.y;
+        //
+        // // gl.glFlush();
+        // // gl.glFinish();
+        // // gl.glPixelStorei(GL3.GL_UNPACK_ALIGNMENT, 1);
+        //
+        // FloatBuffer depthData = FloatBuffer.allocate(1);
+        // gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_DEPTH_COMPONENT,
+        // GL3.GL_FLOAT, depthData);
+        // float mouseZ = depthData.get();
+        //
+        // FloatBuffer colorData = FloatBuffer.allocate(4);
+        // gl.glReadBuffer(GL3.GL_FRONT);
+        // gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_RGBA, GL3.GL_FLOAT,
+        // colorData);
+        //
+        // // System.out.println("Color: " + data.get(0) + " " +
+        // // data.get(1) + " " + data.get(2) + " "
+        // // + data.get(3));
+        //
+        // // System.out.println("Click : " + mouseX + "/" + mouseY);
+        //
+        // if (FloatVectorMath.length(new Float3Vector(colorData.get(0),
+        // colorData.get(1), colorData.get(2))) > 0f) {
+        //
+        // Float3Vector pickResultNear =
+        // MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+        // new float[] { 0, 0, canvasWidth, canvasHeight }, new
+        // Float3Vector(mouseX, mouseY, 0f));
+        // // System.out.println("Pick result near: " +
+        // // pickResultNear);
+        //
+        // Float3Vector pickResultFar =
+        // MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+        // new float[] { 0, 0, canvasWidth, canvasHeight }, new
+        // Float3Vector(mouseX, mouseY, 1f));
+        // // System.out.println("Pick result far: " + pickResultFar);
+        //
+        // Float3Vector pickRay = pickResultFar.sub(pickResultNear);
+        // float distance = pointToVectorDistance(new Float4Vector(0f, 0f, 0f,
+        // 1f), pickResultNear,
+        // pickResultFar);
+        // System.out.println("Pick ray: " + pickRay + " Distance to origin: " +
+        // distance);
+        //
+        // Float3Vector pickResultZ =
+        // MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
+        // new float[] { 0, 0, canvasWidth, canvasHeight }, new
+        // Float3Vector(mouseX, mouseY, mouseZ));
+        // // System.out.println("Pick result Z: " + pickResultZ);
+        //
+        // clickTranslation = pickResultZ;
+        // }
+        //
+        // } catch (InverseNotAvailableException e) {
+        // e.printStackTrace();
+        // }
 
-        if (pr != null) {
-            try {
-                int mouseX = pr.x;
-                int mouseY = canvasHeight - pr.y;
+        // int window_y = (int)((canvasHeight - pr.y) - (canvasHeight/2f));
+        // float norm_y = (float)(window_y)/((float)canvasHeight/2f);
+        // int window_x = (int)(pr.x - (canvasWidth/2f));
+        // float norm_x = (float)window_x/((float)canvasWidth/2f);
+        //
+        // float y = near_height * norm_y;
+        // float x = near_height * aspect * norm_x;
+        // }
 
-                // gl.glFlush();
-                // gl.glFinish();
-                // gl.glPixelStorei(GL3.GL_UNPACK_ALIGNMENT, 1);
-
-                FloatBuffer depthData = FloatBuffer.allocate(1);
-                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_DEPTH_COMPONENT, GL3.GL_FLOAT, depthData);
-                float mouseZ = depthData.get();
-
-                FloatBuffer colorData = FloatBuffer.allocate(4);
-                gl.glReadBuffer(GL3.GL_FRONT);
-                gl.glReadPixels(mouseX, mouseY, 1, 1, GL3.GL_RGBA, GL3.GL_FLOAT, colorData);
-
-                // System.out.println("Color: " + data.get(0) + " " +
-                // data.get(1) + " " + data.get(2) + " "
-                // + data.get(3));
-
-                // System.out.println("Click : " + mouseX + "/" + mouseY);
-
-                if (FloatVectorMath.length(new Float3Vector(colorData.get(0), colorData.get(1), colorData.get(2))) > 0f) {
-
-                    Float3Vector pickResultNear = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 0f));
-                    // System.out.println("Pick result near: " +
-                    // pickResultNear);
-
-                    Float3Vector pickResultFar = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, 1f));
-                    // System.out.println("Pick result far: " + pickResultFar);
-
-                    Float3Vector pickRay = pickResultFar.sub(pickResultNear);
-                    float distance = pointToVectorDistance(new Float4Vector(0f, 0f, 0f, 1f), pickResultNear,
-                            pickResultFar);
-                    System.out.println("Pick ray: " + pickRay + " Distance to origin: " + distance);
-
-                    Float3Vector pickResultZ = MatrixFMathExt.unProject(makePerspectiveMatrix(), modelViewMatrix,
-                            new float[] { 0, 0, canvasWidth, canvasHeight }, new Float3Vector(mouseX, mouseY, mouseZ));
-                    // System.out.println("Pick result Z: " + pickResultZ);
-
-                    clickTranslation = pickResultZ;
-                }
-
-            } catch (InverseNotAvailableException e) {
-                e.printStackTrace();
-            }
-
-            // int window_y = (int)((canvasHeight - pr.y) - (canvasHeight/2f));
-            // float norm_y = (float)(window_y)/((float)canvasHeight/2f);
-            // int window_x = (int)(pr.x - (canvasWidth/2f));
-            // float norm_x = (float)window_x/((float)canvasWidth/2f);
-            //
-            // float y = near_height * norm_y;
-            // float x = near_height * aspect * norm_x;
-        }
-
-        try {
-            drawClickSphere(gl, lineShaderProgram, clickTranslation);
-        } catch (UninitializedException e) {
-            e.printStackTrace();
-        }
+        // try {
+        // drawClickSphere(gl, lineShaderProgram, clickTranslation);
+        // } catch (UninitializedException e) {
+        // e.printStackTrace();
+        // }
 
         // Make a screenshot, when wanted. The PBO copies the current
         // framebuffer. We then set the state back because we dont want to make
@@ -349,6 +423,23 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
             screenshotWanted = false;
         }
+
+        // if (cachedFileNumber != inputHandler.getFileNumber()) {
+        // File dataFile;
+        // for (int sequenceNumber = 12; sequenceNumber < 13; sequenceNumber++)
+        // {
+        // cachedFileNumber = inputHandler.getFileNumber();
+        // dataFile = new File("/media/maarten/diskhdd2/Via Appia/Rome-000"
+        // + String.format("%03d", sequenceNumber) + ".las");
+        // if (dataFile != null && dataFile.exists()) {
+        // LASFile lasFile = new LASFile(dataFile, 10);
+        // pcModel.delete(gl);
+        // pcModel = new LASPointCloudModel(lasFile);
+        // pcModel.init(gl);
+        //
+        // }
+        // }
+        // }
 
         contextOff(drawable);
     }
@@ -548,7 +639,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         program.setUniformMatrix("MVMatrix", mv);
         // program.use(gl);
 
-        pcModel.draw(gl, program);
+        for (LASPointCloudModel model : pcModel) {
+            model.draw(gl, program);
+        }
     }
 
     // The reshape method is automatically called by the openGL animator if the
