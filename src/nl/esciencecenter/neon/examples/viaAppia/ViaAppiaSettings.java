@@ -1,5 +1,7 @@
 package nl.esciencecenter.neon.examples.viaAppia;
 
+import java.io.File;
+
 import nl.esciencecenter.neon.util.Settings;
 import nl.esciencecenter.neon.util.TypedProperties;
 
@@ -43,6 +45,11 @@ public class ViaAppiaSettings extends Settings {
     }
 
     private String screenshotFileName;
+    private float hueFactor = 1f;
+    private float saturationFactor = 1f;
+
+    private File[] files;
+    private boolean newFilesLoaded = false;
 
     private ViaAppiaSettings() {
         super();
@@ -74,6 +81,40 @@ public class ViaAppiaSettings extends Settings {
      */
     public void setScreenshotFileName(String var) {
         screenshotFileName = var;
+    }
+
+    public float getHueFactor() {
+        return hueFactor;
+    }
+
+    public float getSaturationFactor() {
+        return saturationFactor;
+    }
+
+    public void setHueFactor(float value) {
+        this.hueFactor = value;
+    }
+
+    public void setSaturationFactor(float value) {
+        this.saturationFactor = value;
+    }
+
+    public synchronized void setFiles(File[] files) {
+        this.files = files;
+        this.newFilesLoaded = true;
+    }
+
+    public synchronized File[] getFiles() {
+        if (files != null) {
+            this.newFilesLoaded = false;
+            return files;
+        } else {
+            return new File[0];
+        }
+    }
+
+    public synchronized boolean isNewFiles() {
+        return newFilesLoaded;
     }
 
 }

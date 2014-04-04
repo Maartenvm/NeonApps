@@ -1,6 +1,7 @@
 package nl.esciencecenter.neon.examples.viaAppia.las;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 import javax.media.opengl.GL3;
 
@@ -12,4 +13,7 @@ public interface LASPointDataRecord {
     public int getSizePerRecord();
 
     public int getNumPoints();
+
+    public VertexBufferObject readPoints(GL3 gl, FileChannel recordsBlock, long offset, int skip,
+            BoundingBox overallBoundingBox);
 }

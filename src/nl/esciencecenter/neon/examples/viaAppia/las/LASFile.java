@@ -30,10 +30,18 @@ public class LASFile {
             fc.read(headerBlock);
             publicHeader = new LASPublicHeader(headerBlock);
 
+            System.out.println(publicHeader);
+
             int numPointRecords = publicHeader.getNumberofpointrecords();
             int pointRecordType = publicHeader.getPointDataFormatID();
 
-            if (pointRecordType == 3) {
+            if (pointRecordType == 0) {
+                pointDataRecord = new LASPointDataRecord0(numPointRecords, publicHeader);
+            } else if (pointRecordType == 1) {
+                pointDataRecord = new LASPointDataRecord1(numPointRecords, publicHeader);
+            } else if (pointRecordType == 2) {
+                pointDataRecord = new LASPointDataRecord2(numPointRecords, publicHeader);
+            } else if (pointRecordType == 3) {
                 pointDataRecord = new LASPointDataRecord3(numPointRecords, publicHeader);
             }
         } catch (IOException e) {
@@ -45,13 +53,7 @@ public class LASFile {
         VertexBufferObject result = null;
 
         try (FileChannel fc = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ)) {
-            int dataSize = pointDataRecord.getSizePerRecord() * publicHeader.getNumberofpointrecords();
-
-            ByteBuffer recordsBlock = ByteBuffer.allocate(dataSize);
-            fc.position(publicHeader.getOffsettopointdata());
-            fc.read(recordsBlock);
-
-            result = pointDataRecord.readPoints(gl, recordsBlock, skip, overallBoundingBox);
+            result = pointDataRecord.readPoints(gl, fc, publicHeader.getOffsettopointdata(), skip, overallBoundingBox);
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -5,6 +5,7 @@ import nl.esciencecenter.neon.math.Float3Vector;
 import nl.esciencecenter.neon.math.Float4Matrix;
 import nl.esciencecenter.neon.math.Float4Vector;
 import nl.esciencecenter.neon.math.FloatMatrixMath;
+import nl.esciencecenter.neon.math.FloatVectorMath;
 
 import com.jogamp.newt.event.KeyEvent;
 import com.jogamp.newt.event.KeyListener;
@@ -72,6 +73,8 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
     float deltaAngleX = 0f;
     float deltaAngleY = 0f;
 
+    private final boolean[] keyStates = new boolean[Short.MAX_VALUE];
+
     @Override
     public void mousePressed(MouseEvent e) {
         dragXorigin = e.getX();
@@ -110,20 +113,47 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
     public void keyPressed(KeyEvent arg0) {
         float fraction = 0.01f;
 
-        if (arg0.isShiftDown()) {
-            fraction = 0.001f;
+        keyStates[arg0.getKeyCode()] = true;
+
+        if (keyStates[KeyEvent.VK_SHIFT]) {
+            fraction = 0.1f;
         }
 
-        if (arg0.getKeyCode() == KeyEvent.VK_W) {
+        if (keyStates[KeyEvent.VK_W]) {
             cameraPosition.setX(cameraPosition.getX() + cameraDirection.getX() * fraction);
             cameraPosition.setY(cameraPosition.getY() + cameraDirection.getY() * fraction);
             cameraPosition.setZ(cameraPosition.getZ() + cameraDirection.getZ() * fraction);
         }
-        if (arg0.getKeyCode() == KeyEvent.VK_S) {
+        if (keyStates[KeyEvent.VK_S]) {
             cameraPosition.setX(cameraPosition.getX() - cameraDirection.getX() * fraction);
             cameraPosition.setY(cameraPosition.getY() - cameraDirection.getY() * fraction);
             cameraPosition.setZ(cameraPosition.getZ() - cameraDirection.getZ() * fraction);
         }
+
+        if (keyStates[KeyEvent.VK_A]) {
+            Float3Vector perp = FloatVectorMath.cross(
+                    new Float3Vector(cameraDirection.getX(), 0f, cameraDirection.getZ()), new Float3Vector(
+                            cameraDirection.getX(), 1f, cameraDirection.getZ()));
+            cameraPosition.setX(cameraPosition.getX() - perp.getX() * fraction);
+            cameraPosition.setZ(cameraPosition.getZ() - perp.getZ() * fraction);
+        }
+
+        if (keyStates[KeyEvent.VK_D]) {
+            Float3Vector perp = FloatVectorMath.cross(
+                    new Float3Vector(cameraDirection.getX(), 0f, cameraDirection.getZ()), new Float3Vector(
+                            cameraDirection.getX(), 1f, cameraDirection.getZ()));
+            cameraPosition.setX(cameraPosition.getX() + perp.getX() * fraction);
+            cameraPosition.setZ(cameraPosition.getZ() + perp.getZ() * fraction);
+        }
+
+        if (keyStates[KeyEvent.VK_SPACE]) {
+            cameraPosition.setY(cameraPosition.getY() + fraction);
+        }
+
+        if (keyStates[KeyEvent.VK_CONTROL]) {
+            cameraPosition.setY(cameraPosition.getY() - fraction);
+        }
+
         // if (arg0.getKeyCode() == KeyEvent.VK_A) {
         // cameraAngleH -= 0.01f;
         // cameraDirection.setX((float) Math.sin(cameraAngleH));
@@ -156,6 +186,10 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
 
     @Override
     public void keyReleased(KeyEvent arg0) {
-        // We could add something useful here
+        keyStates[arg0.getKeyCode()] = false;
+    }
+
+    public Float3Vector getCameraPosition() {
+        return cameraPosition;
     }
 }

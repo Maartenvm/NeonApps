@@ -11,7 +11,7 @@ import javax.media.opengl.GL3;
 import nl.esciencecenter.neon.datastructures.GLSLAttribute;
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
 
-public class LASPointDataRecord0 implements LASPointDataRecord {
+public class LASPointDataRecord1 implements LASPointDataRecord {
     public static int RECORD_SIZE = 20;
 
     /*
@@ -91,12 +91,20 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
      */
     private short PointSource;
 
+    /*
+     * GPS Time: The GPS Time is the double floating point time tag value at
+     * which the point was acquired. It is GPS Week Time if the Global Encoding
+     * low bit is clear and POSIX Time if the Global Encoding low bit is set
+     * (see Global Encoding in the Public Header Block description)
+     */
+    private double GPSTime;
+
     private final int numrecords;
     private int numPoints;
 
     private final LASPublicHeader publicHeader;
 
-    public LASPointDataRecord0(int numrecords, LASPublicHeader publicheader) {
+    public LASPointDataRecord1(int numrecords, LASPublicHeader publicheader) {
         this.numrecords = numrecords;
         this.publicHeader = publicheader;
     }
@@ -116,7 +124,7 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
             float y = recordsBlock.getInt();
             float z = recordsBlock.getInt();
             // Skip all unneeded values in input buffer
-            recordsBlock.position(recordsBlock.position() + 8);
+            recordsBlock.position(recordsBlock.position() + 16);
 
             if (count == skip) {
                 // X
@@ -170,13 +178,6 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
 
         int count = 0;
 
-        double calcMinX = Double.MAX_VALUE;
-        double calcMinY = Double.MAX_VALUE;
-        double calcMinZ = Double.MAX_VALUE;
-        double calcMaxX = Double.MIN_VALUE;
-        double calcMaxY = Double.MIN_VALUE;
-        double calcMaxZ = Double.MIN_VALUE;
-
         try {
             for (long recordNumber = 0; recordNumber < numrecords; recordNumber++) {
                 if (count == skip) {
@@ -184,9 +185,9 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
                     recordsBlock.read(record, offset + (recordNumber * RECORD_SIZE));
                     record.flip();
 
-                    double rawX = record.getInt();
-                    double rawY = record.getInt();
-                    double rawZ = record.getInt();
+                    float rawX = record.getInt();
+                    float rawY = record.getInt();
+                    float rawZ = record.getInt();
 
                     // PROCESS DATA
                     double processedX = (((((rawX * scaleFactorX) + offsetX) - minX) / maxDiff) - 0.5) * 2.0;
@@ -199,42 +200,17 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
                     verticesBuffer.put((float) processedZ);
 
                     count = 0;
-
-                    if (processedX < calcMinX) {
-                        calcMinX = processedX;
-                    }
-                    if (processedX > calcMaxX) {
-                        calcMaxX = processedX;
-                    }
-
-                    if (processedY < calcMinY) {
-                        calcMinY = processedY;
-                    }
-                    if (processedY > calcMaxY) {
-                        calcMaxY = processedY;
-                    }
-
-                    if (processedZ < calcMinZ) {
-                        calcMinZ = processedZ;
-                    }
-                    if (processedZ > calcMaxZ) {
-                        calcMaxZ = processedZ;
-                    }
-
                 }
                 count++;
-
+                record.clear();
             }
-
-            System.out.println("X: " + calcMinX + " - " + calcMaxX);
-            System.out.println("Y: " + calcMinY + " - " + calcMaxY);
-            System.out.println("Z: " + calcMinZ + " - " + calcMaxZ);
 
             recordsBlock.close();
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+
         GLSLAttribute vertices = new GLSLAttribute(verticesBuffer, "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
 
         return new VertexBufferObject(gl, vertices);

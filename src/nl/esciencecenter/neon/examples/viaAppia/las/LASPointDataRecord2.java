@@ -13,7 +13,7 @@ import nl.esciencecenter.neon.datastructures.GLSLAttribute;
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
 import nl.esciencecenter.neon.math.Float3Vector;
 
-public class LASPointDataRecord3 implements LASPointDataRecord {
+public class LASPointDataRecord2 implements LASPointDataRecord {
     public static int RECORD_SIZE = 34;
     /*
      * X, Y, and Z: The X, Y, and Z values are stored as long integers. The X,
@@ -93,14 +93,6 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
     private short PointSource;
 
     /*
-     * GPS Time: The GPS Time is the double floating point time tag value at
-     * which the point was acquired. It is GPS Week Time if the Global Encoding
-     * low bit is clear and POSIX Time if the Global Encoding low bit is set
-     * (see Global Encoding in the Public Header Block description)
-     */
-    private double GPSTime;
-
-    /*
      * Red: The Red image channel value associated with this point
      */
     private short Red;
@@ -120,9 +112,9 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
 
     private final LASPublicHeader publicHeader;
 
-    public LASPointDataRecord3(int numrecords, LASPublicHeader publicHeader) {
+    public LASPointDataRecord2(int numrecords, LASPublicHeader publicheader) {
         this.numrecords = numrecords;
-        this.publicHeader = publicHeader;
+        this.publicHeader = publicheader;
     }
 
     @Override
@@ -130,7 +122,11 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
         recordsBlock.order(ByteOrder.LITTLE_ENDIAN);
         recordsBlock.flip();
 
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        if (skip <= 1) {
+            numPoints = numrecords;
+        } else {
+            numPoints = (int) Math.ceil(numrecords / (skip + 1)) + 1;
+        }
 
         FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
         FloatBuffer vertexColorsBuffer = FloatBuffer.allocate(numPoints * 3);
@@ -177,16 +173,20 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
                 int rawZ = recordsBlock.getInt();
 
                 // Skip all unneeded values in input buffer
-                recordsBlock.position(recordsBlock.position() + 16);
+                recordsBlock.position(recordsBlock.position() + 8);
 
-                byte rlow = recordsBlock.get();
                 byte rhigh = recordsBlock.get();
+                byte rlow = recordsBlock.get();
 
-                byte glow = recordsBlock.get();
                 byte ghigh = recordsBlock.get();
+                byte glow = recordsBlock.get();
 
-                byte blow = recordsBlock.get();
                 byte bhigh = recordsBlock.get();
+                byte blow = recordsBlock.get();
+
+                // short rint16 = recordsBlock.getShort();
+                // short gint16 = recordsBlock.getShort();
+                // short bint16 = recordsBlock.getShort();
 
                 if (count == skip) {
                     // PROCESS DATA
@@ -216,8 +216,9 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
                     vertexColorsBuffer.put(color.getZ());
 
                     count = 0;
+                } else {
+                    count++;
                 }
-                count++;
             }
         } catch (BufferOverflowException e) {
             System.out.println("vertices pos: " + verticesBuffer.position() + "/" + verticesBuffer.capacity());
@@ -241,6 +242,8 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
         record.order(ByteOrder.LITTLE_ENDIAN);
 
         numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        // System.out.println("numPoints: " + numPoints + " : " + numPoints *
+        // 3);
 
         FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
         FloatBuffer vertexColorsBuffer = FloatBuffer.allocate(numPoints * 3);
@@ -276,12 +279,13 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
                     recordsBlock.read(record, offset + (recordNumber * RECORD_SIZE));
                     record.flip();
 
-                    double rawX = record.getInt();
-                    double rawY = record.getInt();
-                    double rawZ = record.getInt();
+                    // READ DATA
+                    int rawX = record.getInt();
+                    int rawY = record.getInt();
+                    int rawZ = record.getInt();
 
                     // Skip all unneeded values in input buffer
-                    record.position(record.position() + 16);
+                    record.position(record.position() + 8);
 
                     byte rlow = record.get();
                     byte rhigh = record.get();
@@ -325,7 +329,6 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
             }
 
             recordsBlock.close();
-
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

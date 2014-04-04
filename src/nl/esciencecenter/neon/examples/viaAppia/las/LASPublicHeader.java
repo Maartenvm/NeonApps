@@ -373,4 +373,30 @@ public class LASPublicHeader {
     public boolean isAcceptableHeader() {
         return acceptableHeader;
     }
+
+    @Override
+    public String toString() {
+        String result = "";
+        result += "file signature:             " + FileSignature + "\n";
+        result += "file source ID:             " + FileSourceID + "\n";
+        result += "global_encoding:            " + GlobalEncoding + "\n";
+        result += "project ID GUID data 1-4:   " + ProjectIDGUIDdata1 + "-" + ProjectIDGUIDdata2 + "-"
+                + ProjectIDGUIDdata3 + "-" + ProjectIDGUIDdata4 + "\n";
+        result += "version major.minor:        " + VersionMajor + "." + VersionMinor + "\n";
+        result += "system identifier:          " + SystemIdentifier + "\n";
+        result += "generating software:        " + GeneratingSoftware + "\n";
+        result += "file creation day/year:     " + FileCreationDayofYear + "/" + FileCreationYear + "\n";
+        result += "header size:                " + HeaderSize + "\n";
+        result += "offset to point data:       " + Offsettopointdata + "\n";
+        result += "number var. length records: " + NumberofVariableLengthRecords + "\n";
+        result += "point data format:          " + PointDataFormatID + "\n";
+        result += "point data record length:   " + PointDataRecordLength + "\n";
+        result += "number of point records:    " + Numberofpointrecords + "\n";
+        result += "number of points by return: " + Numberofpointsbyreturn + "\n";
+        result += "scale factor x y z:         " + Xscalefactor + " " + Yscalefactor + " " + Zscalefactor + "\n";
+        result += "offset x y z:               " + Xoffset + " " + Yoffset + " " + Zoffset + "\n";
+        result += "min x y z:                  " + MinX + " " + MinY + " " + MinZ + "\n";
+        result += "max x y z:                  " + MaxX + " " + MaxY + " " + MaxZ + "\n";
+        return result;
+    }
 }

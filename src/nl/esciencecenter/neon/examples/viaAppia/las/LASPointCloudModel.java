@@ -2,6 +2,7 @@ package nl.esciencecenter.neon.examples.viaAppia.las;
 
 import javax.media.opengl.GL3;
 
+import nl.esciencecenter.neon.examples.viaAppia.ViaAppiaSettings;
 import nl.esciencecenter.neon.exceptions.UninitializedException;
 import nl.esciencecenter.neon.models.Model;
 import nl.esciencecenter.neon.shaders.ShaderProgram;
@@ -18,6 +19,8 @@ public class LASPointCloudModel extends Model {
     private LASPointDataRecord associatedRecord;
 
     private final BoundingBox overallBoundingBox;
+
+    private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
 
     public LASPointCloudModel(LASFile associatedFile, BoundingBox overallBoundingBox) {
         super(VertexFormat.POINTS);
@@ -44,6 +47,7 @@ public class LASPointCloudModel extends Model {
     @Override
     public void draw(GL3 gl, ShaderProgram program) throws UninitializedException {
         if (initialized) {
+
             double scaleFactorX = associatedHeader.getXscalefactor();
             double scaleFactorY = associatedHeader.getYscalefactor();
             double scaleFactorZ = associatedHeader.getZscalefactor();
@@ -73,6 +77,9 @@ public class LASPointCloudModel extends Model {
             program.setUniform("minZ", minZ);
 
             program.setUniform("diffX", diffX);
+
+            program.setUniform("hue", settings.getHueFactor());
+            program.setUniform("saturation", settings.getSaturationFactor());
 
             try {
                 program.use(gl);

@@ -59,7 +59,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     private final static Logger LOGGER = LoggerFactory.getLogger(ViaAppiaGLEventListener.class);
 
     // Two example shader program definitions.
-    private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram;
+    private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram,
+            pointCloudShaderColorlessProgram;
 
     // Model definitions, the quad is necessary for Full-screen rendering. The
     // axes are the model we wish to render (example)
@@ -101,6 +102,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     private GeoSphere globe;
 
     int filesToLoad = 105;
+
+    private boolean colorless = false;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -185,6 +188,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             pointCloudShaderProgram = getLoader().createProgram(gl, "lasFile", new File("shaders/vs_lasFileShader.vp"),
                     new File("shaders/fs_lasFileShader.fp"));
 
+            pointCloudShaderColorlessProgram = getLoader().createProgram(gl, "lasFileColorless",
+                    new File("shaders/vs_lasFileShaderColorless.vp"), new File("shaders/fs_lasFileShader.fp"));
+
             // Same for the postprocessing shader.
             // postprocessShader = getLoader().createProgram(gl, "postProcess",
             // new File("shaders/vs_postprocess.vp"),
@@ -216,70 +222,10 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         globe = new GeoSphere(20, 20, 1, false);
         globe.init(gl);
 
-        pcModel = new ArrayList<LASPointCloudModel>();
-
-        double minMinX = Double.MAX_VALUE;
-        double minMinY = Double.MAX_VALUE;
-        double minMinZ = Double.MAX_VALUE;
-
-        double maxMaxX = Double.MIN_VALUE;
-        double maxMaxY = Double.MIN_VALUE;
-        double maxMaxZ = Double.MIN_VALUE;
-
-        BoundingBox overallBoundingBox = new BoundingBox(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
-
-        File dataFile;
-        for (int sequenceNumber = 1; sequenceNumber < filesToLoad; sequenceNumber++) {
-            // cachedFileNumber = inputHandler.getFileNumber();
-            dataFile = new File("/media/maarten/diskhdd2/Via Appia/Rome-000" + String.format("%03d", sequenceNumber)
-                    + ".las");
-            if (dataFile != null && dataFile.exists()) {
-                LASFile lasFile = new LASFile(dataFile, 10);
-
-                LASPublicHeader header = lasFile.getPublicHeader();
-                double minX = header.getMinX();
-                if (minX < minMinX) {
-                    minMinX = minX;
-                }
-                double minY = header.getMinY();
-                if (minY < minMinY) {
-                    minMinY = minY;
-                }
-                double minZ = header.getMinZ();
-                if (minZ < minMinZ) {
-                    minMinZ = minZ;
-                }
-                double maxX = header.getMaxX();
-                if (maxX > maxMaxX) {
-                    maxMaxX = maxX;
-                }
-                double maxY = header.getMaxY();
-                if (maxY > maxMaxY) {
-                    maxMaxY = maxY;
-                }
-                double maxZ = header.getMaxZ();
-                if (maxZ > maxMaxZ) {
-                    maxMaxZ = maxZ;
-                }
-
-                LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox);
-                pcModel.add(currentModel);
-            }
-        }
-
-        overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
-
-        for (LASPointCloudModel currentModel : pcModel) {
-            // LASPointDataRecord record = currentModel.getRecord();
-
-            currentModel.init(gl);// , minMinX, maxMaxX, minMinY, maxMaxY,
-                                  // minMinZ, maxMaxZ);
-        }
-
-        System.out.println("init complete");
-
         // scatBuilder = new ScatBuilder();
         // new Thread(scatBuilder).start();
+
+        reloadData(gl);
 
         // Release the context.
         contextOff(drawable);
@@ -442,6 +388,118 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         // }
 
         contextOff(drawable);
+
+        // Check if the user wants to load new files
+        if (settings.isNewFiles()) {
+            reloadData(gl);
+        }
+    }
+
+    private void reloadData(GL3 gl) {
+        if (pcModel != null) {
+            for (LASPointCloudModel currentModel : pcModel) {
+                currentModel.delete(gl);
+            }
+        }
+
+        pcModel = new ArrayList<LASPointCloudModel>();
+
+        double minMinX = Double.MAX_VALUE;
+        double minMinY = Double.MAX_VALUE;
+        double minMinZ = Double.MAX_VALUE;
+
+        double maxMaxX = Double.MIN_VALUE;
+        double maxMaxY = Double.MIN_VALUE;
+        double maxMaxZ = Double.MIN_VALUE;
+
+        BoundingBox overallBoundingBox = new BoundingBox(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
+
+        boolean colorDataIncluded = true;
+
+        for (File dataFile : settings.getFiles()) {
+            if (dataFile != null && dataFile.exists()) {
+                LASFile lasFile = new LASFile(dataFile, 1000);
+
+                LASPublicHeader header = lasFile.getPublicHeader();
+                double minX = header.getMinX();
+                if (minX < minMinX) {
+                    minMinX = minX;
+                }
+                double minY = header.getMinY();
+                if (minY < minMinY) {
+                    minMinY = minY;
+                }
+                double minZ = header.getMinZ();
+                if (minZ < minMinZ) {
+                    minMinZ = minZ;
+                }
+                double maxX = header.getMaxX();
+                if (maxX > maxMaxX) {
+                    maxMaxX = maxX;
+                }
+                double maxY = header.getMaxY();
+                if (maxY > maxMaxY) {
+                    maxMaxY = maxY;
+                }
+                double maxZ = header.getMaxZ();
+                if (maxZ > maxMaxZ) {
+                    maxMaxZ = maxZ;
+                }
+
+                if (header.getPointDataFormatID() < 2) {
+                    colorDataIncluded = false;
+                }
+
+                LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox);
+                pcModel.add(currentModel);
+            }
+        }
+
+        overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
+
+        for (LASPointCloudModel currentModel : pcModel) {
+            // LASPointDataRecord record = currentModel.getRecord();
+
+            currentModel.init(gl);// , minMinX, maxMaxX, minMinY, maxMaxY,
+                                  // minMinZ, maxMaxZ);
+        }
+
+        // dataFile = new
+        // File("/media/maarten/diskhdd2/Via Appia/SITES/SITE_560/SITE_560_MAX.las");
+        // LASFile lasFile = new LASFile(dataFile, 0);
+        // LASPublicHeader header = lasFile.getPublicHeader();
+        // double minX = header.getMinX();
+        // if (minX < minMinX) {
+        // minMinX = minX;
+        // }
+        // double minY = header.getMinY();
+        // if (minY < minMinY) {
+        // minMinY = minY;
+        // }
+        // double minZ = header.getMinZ();
+        // if (minZ < minMinZ) {
+        // minMinZ = minZ;
+        // }
+        // double maxX = header.getMaxX();
+        // if (maxX > maxMaxX) {
+        // maxMaxX = maxX;
+        // }
+        // double maxY = header.getMaxY();
+        // if (maxY > maxMaxY) {
+        // maxMaxY = maxY;
+        // }
+        // double maxZ = header.getMaxZ();
+        // if (maxZ > maxMaxZ) {
+        // maxMaxZ = maxZ;
+        // }
+        //
+        // LASPointCloudModel currentModel1 = new LASPointCloudModel(lasFile,
+        // overallBoundingBox);
+        // pcModel.add(currentModel1);
+
+        colorless = !colorDataIncluded;
+
+        System.out.println("init complete");
     }
 
     private float pointToVectorDistance(Float4Vector point, Float3Vector a, Float3Vector b) {
@@ -476,7 +534,12 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         try {
             // renderScatterplot(gl, mv, textShaderProgram);
             renderAxes(gl, new Float4Matrix(mv), axesShaderProgram);
-            renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderProgram);
+
+            if (colorless) {
+                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderColorlessProgram);
+            } else {
+                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderProgram);
+            }
 
             // drawGlobe(gl, lineShaderProgram);
 
@@ -638,6 +701,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         mv = mv.mul(objectRotationMatrix);
         program.setUniformMatrix("MVMatrix", mv);
         // program.use(gl);
+
+        Float3Vector cameraPosition = inputHandler.getCameraPosition();
+        program.setUniformVector("cameraPos", cameraPosition);
 
         for (LASPointCloudModel model : pcModel) {
             model.draw(gl, program);
