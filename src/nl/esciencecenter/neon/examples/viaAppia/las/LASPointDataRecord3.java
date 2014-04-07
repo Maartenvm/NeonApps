@@ -1,7 +1,6 @@
 package nl.esciencecenter.neon.examples.viaAppia.las;
 
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -126,121 +125,16 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
     }
 
     @Override
-    public VertexBufferObject readPoints(GL3 gl, ByteBuffer recordsBlock, int skip, BoundingBox overallBoundingBox) {
-        recordsBlock.order(ByteOrder.LITTLE_ENDIAN);
-        recordsBlock.flip();
-
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
-
-        FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
-        FloatBuffer vertexColorsBuffer = FloatBuffer.allocate(numPoints * 3);
-
-        double scaleFactorX = publicHeader.getXscalefactor();
-        double scaleFactorY = publicHeader.getYscalefactor();
-        double scaleFactorZ = publicHeader.getZscalefactor();
-
-        double offsetX = publicHeader.getXoffset();
-        double offsetY = publicHeader.getYoffset();
-        double offsetZ = publicHeader.getZoffset();
-
-        double minX = overallBoundingBox.getMinX();
-        double minY = overallBoundingBox.getMinY();
-        double minZ = overallBoundingBox.getMinZ();
-
-        double maxX = overallBoundingBox.getMaxX();
-        double maxY = overallBoundingBox.getMaxY();
-        double maxZ = overallBoundingBox.getMaxZ();
-
-        double diffX = maxX - minX;
-        double diffY = maxY - minY;
-        double diffZ = maxZ - minZ;
-
-        double offset2X = offsetX - minX;
-        double offset2Y = offsetY - minY;
-        double offset2Z = offsetZ - minZ;
-
-        double offsetdivX = (offset2X / diffX) - 0.5;
-        double offsetdivY = (offset2Y / diffX) - 0.5;
-        double offsetdivZ = (offset2Z / diffX);
-
-        int count = 0;
-        int i = 0;
-
-        double avgX = minX + (0.5 * diffX);
-        double graphicOffsetX = avgX;
-
-        try {
-            for (i = 0; i < numrecords; i++) {
-                // READ DATA
-                int rawX = recordsBlock.getInt();
-                int rawY = recordsBlock.getInt();
-                int rawZ = recordsBlock.getInt();
-
-                // Skip all unneeded values in input buffer
-                recordsBlock.position(recordsBlock.position() + 16);
-
-                byte rlow = recordsBlock.get();
-                byte rhigh = recordsBlock.get();
-
-                byte glow = recordsBlock.get();
-                byte ghigh = recordsBlock.get();
-
-                byte blow = recordsBlock.get();
-                byte bhigh = recordsBlock.get();
-
-                if (count == skip) {
-                    // PROCESS DATA
-                    double processedX = (((((rawX * scaleFactorX) + offsetX) - minX) / diffX) - 0.5) * 2.0;
-                    double processedY = (((((rawY * scaleFactorY) + offsetY) - minY) / diffX) - 0.5) * 2.0;
-                    double processedZ = ((((rawZ * scaleFactorZ) + offsetZ) - minZ) / diffX) * 2.0;
-
-                    short rint16 = (short) (((rlow & 0xFF) << 8) | (rhigh & 0xFF));
-                    short gint16 = (short) (((glow & 0xFF) << 8) | (ghigh & 0xFF));
-                    short bint16 = (short) (((blow & 0xFF) << 8) | (bhigh & 0xFF));
-
-                    float rescaledR = (rint16 / 255f);
-                    float rescaledG = (gint16 / 255f);
-                    float rescaledB = (bint16 / 255f);
-
-                    Float3Vector color = new Float3Vector(rescaledR, rescaledG, rescaledB);
-                    // color = FloatVectorMath.increaseHue(color, 1.5f);
-
-                    // WRITE DATA XYZ
-                    verticesBuffer.put((float) processedX);
-                    verticesBuffer.put((float) processedY);
-                    verticesBuffer.put((float) processedZ);
-
-                    // RGB
-                    vertexColorsBuffer.put(color.getX());
-                    vertexColorsBuffer.put(color.getY());
-                    vertexColorsBuffer.put(color.getZ());
-
-                    count = 0;
-                }
-                count++;
-            }
-        } catch (BufferOverflowException e) {
-            System.out.println("vertices pos: " + verticesBuffer.position() + "/" + verticesBuffer.capacity());
-            System.out.println("colors   pos: " + vertexColorsBuffer.position() + "/" + vertexColorsBuffer.capacity());
-            System.out.println("numPoints: " + i);
-        }
-
-        verticesBuffer.flip();
-        vertexColorsBuffer.flip();
-
-        GLSLAttribute vertices = new GLSLAttribute(verticesBuffer, "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
-        GLSLAttribute vertexColors = new GLSLAttribute(vertexColorsBuffer, "MCvertexColor", GLSLAttribute.SIZE_FLOAT, 3);
-
-        return new VertexBufferObject(gl, vertices, vertexColors);
-    }
-
-    @Override
     public VertexBufferObject readPoints(GL3 gl, FileChannel recordsBlock, long offset, int skip,
             BoundingBox overallBoundingBox) {
         ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE);
         record.order(ByteOrder.LITTLE_ENDIAN);
 
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        if (skip > 0) {
+            numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        } else {
+            numPoints = numrecords;
+        }
 
         FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
         FloatBuffer vertexColorsBuffer = FloatBuffer.allocate(numPoints * 3);
@@ -319,9 +213,9 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
                     vertexColorsBuffer.put(color.getZ());
 
                     count = 0;
+                } else {
+                    count++;
                 }
-                count++;
-                record.clear();
             }
 
             recordsBlock.close();

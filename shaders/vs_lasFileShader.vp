@@ -8,16 +8,16 @@ out vec4 vertexColor;
 uniform mat4 PMatrix;
 uniform mat4 MVMatrix;
 
-uniform double scaleFactorX;
-uniform double scaleFactorY;
-uniform double scaleFactorZ;
-uniform double offsetX;
-uniform double offsetY;
-uniform double offsetZ;
-uniform double minX;
-uniform double minY;
-uniform double minZ;
-uniform double diffX;
+//uniform double scaleFactorX;
+//uniform double scaleFactorY;
+//uniform double scaleFactorZ;
+//uniform double offsetX;
+//uniform double offsetY;
+//uniform double offsetZ;
+//uniform double minX;
+//uniform double minY;
+//uniform double minZ;
+//uniform double diffX;
 
 uniform float hue;
 uniform float saturation;
@@ -133,7 +133,7 @@ void HSVtoRGB( inout vec3 color ) {
 }
 
 void main() {
-	//gl_PointSize = 3;
+	gl_PointSize = 3;
 	
     //float processedX = float((((((MCvertex.x * scaleFactorX) + offsetX) - minX) / diffX) - 0.5) * 2.0);
     //float processedY = float((((((MCvertex.y * scaleFactorY) + offsetY) - minY) / diffX) - 0.5) * 2.0);
@@ -157,8 +157,8 @@ void main() {
 	vertexColor = vec4(color.r ,color.g ,color.b, 1.0);
 	//vertexColor = vec4(1.0, 1.0, 1.0, 1.0);
     
-    float dist = distance(cameraPos, (MVMatrix * vec4(MCvertex.xyz,1.0)).xyz);
-    gl_PointSize = (1.0/(dist*dist)) * 12.0;
+    //float dist = distance(cameraPos, (MVMatrix * vec4(MCvertex.xyz,1.0)).xyz);
+    //gl_PointSize = (1.0/(dist*dist)) * 12.0;
         
     gl_Position = PMatrix * MVMatrix * vec4(MCvertex.xyz,1.0);
 }

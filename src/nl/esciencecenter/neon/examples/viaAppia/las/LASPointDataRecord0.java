@@ -102,47 +102,16 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
     }
 
     @Override
-    public VertexBufferObject readPoints(GL3 gl, ByteBuffer recordsBlock, int skip, BoundingBox bbox) {
-        recordsBlock.order(ByteOrder.LITTLE_ENDIAN);
-
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
-
-        FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
-
-        int count = 0;
-        int i = 0;
-        for (i = 0; i < numrecords; i++) {
-            float x = recordsBlock.getInt();
-            float y = recordsBlock.getInt();
-            float z = recordsBlock.getInt();
-            // Skip all unneeded values in input buffer
-            recordsBlock.position(recordsBlock.position() + 8);
-
-            if (count == skip) {
-                // X
-                verticesBuffer.put(x);
-                // Y
-                verticesBuffer.put(y);
-                // Z
-                verticesBuffer.put(z);
-
-                count = 0;
-            }
-            count++;
-        }
-
-        GLSLAttribute vertices = new GLSLAttribute(verticesBuffer, "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
-
-        return new VertexBufferObject(gl, vertices);
-    }
-
-    @Override
     public VertexBufferObject readPoints(GL3 gl, FileChannel recordsBlock, long offset, int skip,
             BoundingBox overallBoundingBox) {
         ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE);
         record.order(ByteOrder.LITTLE_ENDIAN);
 
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        if (skip > 0) {
+            numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        } else {
+            numPoints = numrecords;
+        }
 
         FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
 
@@ -170,13 +139,6 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
 
         int count = 0;
 
-        double calcMinX = Double.MAX_VALUE;
-        double calcMinY = Double.MAX_VALUE;
-        double calcMinZ = Double.MAX_VALUE;
-        double calcMaxX = Double.MIN_VALUE;
-        double calcMaxY = Double.MIN_VALUE;
-        double calcMaxZ = Double.MIN_VALUE;
-
         try {
             for (long recordNumber = 0; recordNumber < numrecords; recordNumber++) {
                 if (count == skip) {
@@ -184,9 +146,22 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
                     recordsBlock.read(record, offset + (recordNumber * RECORD_SIZE));
                     record.flip();
 
-                    double rawX = record.getInt();
-                    double rawY = record.getInt();
-                    double rawZ = record.getInt();
+                    byte rhigh = record.get();
+                    byte rlow = record.get();
+
+                    byte ghigh = record.get();
+                    byte glow = record.get();
+
+                    byte bhigh = record.get();
+                    byte blow = record.get();
+
+                    double rawX = (((rlow & 0xFF) << 8) | (rhigh & 0xFF));
+                    double rawY = (((glow & 0xFF) << 8) | (ghigh & 0xFF));
+                    double rawZ = (((blow & 0xFF) << 8) | (bhigh & 0xFF));
+
+                    // double rawX = record.getInt();
+                    // double rawY = record.getInt();
+                    // double rawZ = record.getInt();
 
                     // PROCESS DATA
                     double processedX = (((((rawX * scaleFactorX) + offsetX) - minX) / maxDiff) - 0.5) * 2.0;
@@ -199,36 +174,11 @@ public class LASPointDataRecord0 implements LASPointDataRecord {
                     verticesBuffer.put((float) processedZ);
 
                     count = 0;
-
-                    if (processedX < calcMinX) {
-                        calcMinX = processedX;
-                    }
-                    if (processedX > calcMaxX) {
-                        calcMaxX = processedX;
-                    }
-
-                    if (processedY < calcMinY) {
-                        calcMinY = processedY;
-                    }
-                    if (processedY > calcMaxY) {
-                        calcMaxY = processedY;
-                    }
-
-                    if (processedZ < calcMinZ) {
-                        calcMinZ = processedZ;
-                    }
-                    if (processedZ > calcMaxZ) {
-                        calcMaxZ = processedZ;
-                    }
-
+                } else {
+                    count++;
                 }
-                count++;
 
             }
-
-            System.out.println("X: " + calcMinX + " - " + calcMaxX);
-            System.out.println("Y: " + calcMinY + " - " + calcMaxY);
-            System.out.println("Z: " + calcMinZ + " - " + calcMaxZ);
 
             recordsBlock.close();
         } catch (IOException e) {

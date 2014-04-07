@@ -19,11 +19,8 @@ public class LASFile {
 
     private final File dataFile;
 
-    int skip;
-
-    public LASFile(File dataFile, int skip) {
+    public LASFile(File dataFile) {
         this.dataFile = dataFile;
-        this.skip = skip;
 
         try (FileChannel fc = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ)) {
             ByteBuffer headerBlock = ByteBuffer.allocate(LASPublicHeader.HEADER_SIZE);
@@ -49,7 +46,7 @@ public class LASFile {
         }
     }
 
-    public VertexBufferObject readPoints(GL3 gl, BoundingBox overallBoundingBox) {
+    public VertexBufferObject readPoints(GL3 gl, BoundingBox overallBoundingBox, int skip) {
         VertexBufferObject result = null;
 
         try (FileChannel fc = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ)) {

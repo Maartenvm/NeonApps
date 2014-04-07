@@ -7,16 +7,16 @@ out vec4 vertexColor;
 uniform mat4 PMatrix;
 uniform mat4 MVMatrix;
 
-uniform double scaleFactorX;
-uniform double scaleFactorY;
-uniform double scaleFactorZ;
-uniform double offsetX;
-uniform double offsetY;
-uniform double offsetZ;
-uniform double minX;
-uniform double minY;
-uniform double minZ;
-uniform double diffX;
+//uniform double scaleFactorX;
+//uniform double scaleFactorY;
+//uniform double scaleFactorZ;
+//uniform double offsetX;
+//uniform double offsetY;
+//uniform double offsetZ;
+//uniform double minX;
+//uniform double minY;
+//uniform double minZ;
+//uniform double diffX;
 
 uniform float hue;
 uniform float saturation;

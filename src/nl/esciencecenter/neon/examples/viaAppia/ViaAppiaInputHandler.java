@@ -111,12 +111,12 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
 
     @Override
     public void keyPressed(KeyEvent arg0) {
-        float fraction = 0.01f;
+        float fraction = 0.002f;
 
         keyStates[arg0.getKeyCode()] = true;
 
         if (keyStates[KeyEvent.VK_SHIFT]) {
-            fraction = 0.1f;
+            fraction = 0.01f;
         }
 
         if (keyStates[KeyEvent.VK_W]) {
@@ -153,25 +153,6 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
         if (keyStates[KeyEvent.VK_CONTROL]) {
             cameraPosition.setY(cameraPosition.getY() - fraction);
         }
-
-        // if (arg0.getKeyCode() == KeyEvent.VK_A) {
-        // cameraAngleH -= 0.01f;
-        // cameraDirection.setX((float) Math.sin(cameraAngleH));
-        // cameraDirection.setZ((float) -Math.cos(cameraAngleH));
-        // }
-        // if (arg0.getKeyCode() == KeyEvent.VK_D) {
-        // cameraAngleH += 0.01f;
-        // cameraDirection.setX((float) Math.sin(cameraAngleH));
-        // cameraDirection.setZ((float) -Math.cos(cameraAngleH));
-        // }
-        // if (arg0.getKeyCode() == KeyEvent.VK_SHIFT) {
-        // cameraAngleV -= 0.01f;
-        // cameraDirection.setY((float) Math.sin(cameraAngleV));
-        // }
-        // if (arg0.getKeyCode() == KeyEvent.VK_CONTROL) {
-        // cameraAngleV += 0.01f;
-        // cameraDirection.setY((float) Math.sin(cameraAngleV));
-        // }
     }
 
     public Float4Matrix getModelview() {

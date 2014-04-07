@@ -22,8 +22,11 @@ public class LASPointCloudModel extends Model {
 
     private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
 
-    public LASPointCloudModel(LASFile associatedFile, BoundingBox overallBoundingBox) {
+    private final int skip;
+
+    public LASPointCloudModel(LASFile associatedFile, BoundingBox overallBoundingBox, int skip) {
         super(VertexFormat.POINTS);
+        this.skip = skip;
 
         this.associatedFile = associatedFile;
         this.overallBoundingBox = overallBoundingBox;
@@ -34,7 +37,7 @@ public class LASPointCloudModel extends Model {
         if (!initialized) {
             delete(gl);
 
-            setVbo(associatedFile.readPoints(gl, overallBoundingBox));
+            setVbo(associatedFile.readPoints(gl, overallBoundingBox, skip));
 
             this.associatedHeader = associatedFile.getPublicHeader();
             this.associatedRecord = associatedFile.getPointDataRecord();
@@ -48,35 +51,35 @@ public class LASPointCloudModel extends Model {
     public void draw(GL3 gl, ShaderProgram program) throws UninitializedException {
         if (initialized) {
 
-            double scaleFactorX = associatedHeader.getXscalefactor();
-            double scaleFactorY = associatedHeader.getYscalefactor();
-            double scaleFactorZ = associatedHeader.getZscalefactor();
-
-            double offsetX = associatedHeader.getXoffset();
-            double offsetY = associatedHeader.getYoffset();
-            double offsetZ = associatedHeader.getZoffset();
-
-            double minX = associatedHeader.getMinX();
-            double minY = associatedHeader.getMinY();
-            double minZ = associatedHeader.getMinZ();
-
-            double maxX = associatedHeader.getMaxX();
-
-            double diffX = maxX - minX;
-
-            program.setUniform("scaleFactorX", scaleFactorX);
-            program.setUniform("scaleFactorY", scaleFactorY);
-            program.setUniform("scaleFactorZ", scaleFactorZ);
-
-            program.setUniform("offsetX", offsetX);
-            program.setUniform("offsetY", offsetY);
-            program.setUniform("offsetZ", offsetZ);
-
-            program.setUniform("minX", minX);
-            program.setUniform("minY", minY);
-            program.setUniform("minZ", minZ);
-
-            program.setUniform("diffX", diffX);
+            // double scaleFactorX = associatedHeader.getXscalefactor();
+            // double scaleFactorY = associatedHeader.getYscalefactor();
+            // double scaleFactorZ = associatedHeader.getZscalefactor();
+            //
+            // double offsetX = associatedHeader.getXoffset();
+            // double offsetY = associatedHeader.getYoffset();
+            // double offsetZ = associatedHeader.getZoffset();
+            //
+            // double minX = associatedHeader.getMinX();
+            // double minY = associatedHeader.getMinY();
+            // double minZ = associatedHeader.getMinZ();
+            //
+            // double maxX = associatedHeader.getMaxX();
+            //
+            // double diffX = maxX - minX;
+            //
+            // program.setUniform("scaleFactorX", scaleFactorX);
+            // program.setUniform("scaleFactorY", scaleFactorY);
+            // program.setUniform("scaleFactorZ", scaleFactorZ);
+            //
+            // program.setUniform("offsetX", offsetX);
+            // program.setUniform("offsetY", offsetY);
+            // program.setUniform("offsetZ", offsetZ);
+            //
+            // program.setUniform("minX", minX);
+            // program.setUniform("minY", minY);
+            // program.setUniform("minZ", minZ);
+            //
+            // program.setUniform("diffX", diffX);
 
             program.setUniform("hue", settings.getHueFactor());
             program.setUniform("saturation", settings.getSaturationFactor());

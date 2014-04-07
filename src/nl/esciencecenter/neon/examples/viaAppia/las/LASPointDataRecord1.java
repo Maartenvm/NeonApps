@@ -12,7 +12,7 @@ import nl.esciencecenter.neon.datastructures.GLSLAttribute;
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
 
 public class LASPointDataRecord1 implements LASPointDataRecord {
-    public static int RECORD_SIZE = 20;
+    public static int RECORD_SIZE = 28;
 
     /*
      * X, Y, and Z: The X, Y, and Z values are stored as long integers. The X,
@@ -110,47 +110,16 @@ public class LASPointDataRecord1 implements LASPointDataRecord {
     }
 
     @Override
-    public VertexBufferObject readPoints(GL3 gl, ByteBuffer recordsBlock, int skip, BoundingBox bbox) {
-        recordsBlock.order(ByteOrder.LITTLE_ENDIAN);
-
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
-
-        FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
-
-        int count = 0;
-        int i = 0;
-        for (i = 0; i < numrecords; i++) {
-            float x = recordsBlock.getInt();
-            float y = recordsBlock.getInt();
-            float z = recordsBlock.getInt();
-            // Skip all unneeded values in input buffer
-            recordsBlock.position(recordsBlock.position() + 16);
-
-            if (count == skip) {
-                // X
-                verticesBuffer.put(x);
-                // Y
-                verticesBuffer.put(y);
-                // Z
-                verticesBuffer.put(z);
-
-                count = 0;
-            }
-            count++;
-        }
-
-        GLSLAttribute vertices = new GLSLAttribute(verticesBuffer, "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
-
-        return new VertexBufferObject(gl, vertices);
-    }
-
-    @Override
     public VertexBufferObject readPoints(GL3 gl, FileChannel recordsBlock, long offset, int skip,
             BoundingBox overallBoundingBox) {
         ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE);
         record.order(ByteOrder.LITTLE_ENDIAN);
 
-        numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        if (skip > 0) {
+            numPoints = (int) Math.ceil(numrecords / skip) + 1;
+        } else {
+            numPoints = numrecords;
+        }
 
         FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
 
@@ -200,9 +169,9 @@ public class LASPointDataRecord1 implements LASPointDataRecord {
                     verticesBuffer.put((float) processedZ);
 
                     count = 0;
+                } else {
+                    count++;
                 }
-                count++;
-                record.clear();
             }
 
             recordsBlock.close();

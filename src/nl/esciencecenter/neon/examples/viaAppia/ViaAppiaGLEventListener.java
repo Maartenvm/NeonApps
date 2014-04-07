@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ViaAppiaGLEventListener extends NeonGLEventListener {
     private final static Logger LOGGER = LoggerFactory.getLogger(ViaAppiaGLEventListener.class);
+    private final long MAX_POINTS = 2500000;
 
     // Two example shader program definitions.
     private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram,
@@ -68,7 +69,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
     // private ScatBuilder scatBuilder;
     // private ScatterPlot3D scat;
-    private List<LASPointCloudModel> pcModel;
+    private List<LASPointCloudModel> pcModels;
 
     // Global (singleton) settings instance.
     private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
@@ -379,9 +380,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         // + String.format("%03d", sequenceNumber) + ".las");
         // if (dataFile != null && dataFile.exists()) {
         // LASFile lasFile = new LASFile(dataFile, 10);
-        // pcModel.delete(gl);
-        // pcModel = new LASPointCloudModel(lasFile);
-        // pcModel.init(gl);
+        // pcModels.delete(gl);
+        // pcModels = new LASPointCloudModel(lasFile);
+        // pcModels.init(gl);
         //
         // }
         // }
@@ -396,13 +397,13 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     }
 
     private void reloadData(GL3 gl) {
-        if (pcModel != null) {
-            for (LASPointCloudModel currentModel : pcModel) {
+        if (pcModels != null) {
+            for (LASPointCloudModel currentModel : pcModels) {
                 currentModel.delete(gl);
             }
         }
 
-        pcModel = new ArrayList<LASPointCloudModel>();
+        pcModels = new ArrayList<LASPointCloudModel>();
 
         double minMinX = Double.MAX_VALUE;
         double minMinY = Double.MAX_VALUE;
@@ -416,9 +417,12 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
         boolean colorDataIncluded = true;
 
+        List<LASFile> lasFiles = new ArrayList<LASFile>();
+        long totalRecords = 0;
+
         for (File dataFile : settings.getFiles()) {
             if (dataFile != null && dataFile.exists()) {
-                LASFile lasFile = new LASFile(dataFile, 1000);
+                LASFile lasFile = new LASFile(dataFile);
 
                 LASPublicHeader header = lasFile.getPublicHeader();
                 double minX = header.getMinX();
@@ -450,14 +454,32 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
                     colorDataIncluded = false;
                 }
 
-                LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox);
-                pcModel.add(currentModel);
+                totalRecords += header.getNumberofpointrecords();
+
+                lasFiles.add(lasFile);
             }
+        }
+
+        double frac = (totalRecords / MAX_POINTS) - 1.0;
+        int skip;
+
+        if (frac < 0.0) {
+            skip = 0;
+        } else {
+            skip = (int) Math.ceil(frac);
+        }
+
+        System.out.println("Number of records: " + totalRecords);
+        System.out.println("Skipping         : " + skip);
+
+        for (LASFile lasFile : lasFiles) {
+            LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox, skip);
+            pcModels.add(currentModel);
         }
 
         overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
 
-        for (LASPointCloudModel currentModel : pcModel) {
+        for (LASPointCloudModel currentModel : pcModels) {
             // LASPointDataRecord record = currentModel.getRecord();
 
             currentModel.init(gl);// , minMinX, maxMaxX, minMinY, maxMaxY,
@@ -495,7 +517,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         //
         // LASPointCloudModel currentModel1 = new LASPointCloudModel(lasFile,
         // overallBoundingBox);
-        // pcModel.add(currentModel1);
+        // pcModels.add(currentModel1);
 
         colorless = !colorDataIncluded;
 
@@ -705,7 +727,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         Float3Vector cameraPosition = inputHandler.getCameraPosition();
         program.setUniformVector("cameraPos", cameraPosition);
 
-        for (LASPointCloudModel model : pcModel) {
+        for (LASPointCloudModel model : pcModels) {
             model.draw(gl, program);
         }
     }
