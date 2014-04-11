@@ -173,4 +173,8 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
     public Float3Vector getCameraPosition() {
         return cameraPosition;
     }
+
+    public Float3Vector getCameraDirection() {
+        return cameraDirection;
+    }
 }

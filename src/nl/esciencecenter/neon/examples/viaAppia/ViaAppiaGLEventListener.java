@@ -61,7 +61,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
     // Two example shader program definitions.
     private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram,
-            pointCloudShaderColorlessProgram;
+            pointCloudShaderColorlessProgram, octreeShaderProgram;
 
     // Model definitions, the quad is necessary for Full-screen rendering. The
     // axes are the model we wish to render (example)
@@ -105,6 +105,10 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     int filesToLoad = 105;
 
     private boolean colorless = false;
+
+    private OctreeNode root;
+    private BoxModel baseBox;
+    private Frustum frustum;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -154,8 +158,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         gl.glClearDepth(1.0f);
 
         // Enable Culling (render only the camera-facing sides of objects).
-        // gl.glEnable(GL3.GL_CULL_FACE);
-        // gl.glCullFace(GL3.GL_BACK);
+        gl.glEnable(GL3.GL_CULL_FACE);
+        gl.glCullFace(GL3.GL_BACK);
 
         // Enable Blending (needed for both Transparency and Anti-Aliasing)
         gl.glBlendFunc(GL3.GL_SRC_ALPHA, GL3.GL_ONE_MINUS_SRC_ALPHA);
@@ -165,7 +169,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         gl.setSwapInterval(1);
 
         // Set black background
-        gl.glClearColor(0f, 0f, 0f, 0f);
+        gl.glClearColor(1f, 1f, 1f, 1f);
 
         // Enable programmatic setting of point size, for rendering points (not
         // needed for this example application).
@@ -191,6 +195,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
             pointCloudShaderColorlessProgram = getLoader().createProgram(gl, "lasFileColorless",
                     new File("shaders/vs_lasFileShaderColorless.vp"), new File("shaders/fs_lasFileShader.fp"));
+
+            octreeShaderProgram = getLoader().createProgram(gl, "octree", new File("shaders/vs_octree.vp"),
+                    new File("shaders/fs_octree.fp"));
 
             // Same for the postprocessing shader.
             // postprocessShader = getLoader().createProgram(gl, "postProcess",
@@ -225,6 +232,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
         // scatBuilder = new ScatBuilder();
         // new Thread(scatBuilder).start();
+
+        baseBox = new BoxModel();
+        baseBox.init(gl);
 
         reloadData(gl);
 
@@ -460,6 +470,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             }
         }
 
+        overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
+
         double frac = (totalRecords / MAX_POINTS) - 1.0;
         int skip;
 
@@ -472,52 +484,22 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         System.out.println("Number of records: " + totalRecords);
         System.out.println("Skipping         : " + skip);
 
+        root = new OctreeNode(baseBox, 100, 0, new Float3Vector(-1f, -1f, -1f), 2f);
         for (LASFile lasFile : lasFiles) {
-            LASPointCloudModel currentModel = new LASPointCloudModel(lasFile, overallBoundingBox, skip);
-            pcModels.add(currentModel);
+            lasFile.readPointsToOctree(root, overallBoundingBox);
         }
+        root.finalizeAdding();
+        root.init(gl);
 
-        overallBoundingBox.set(minMinX, maxMaxX, minMinY, maxMaxY, minMinZ, maxMaxZ);
-
-        for (LASPointCloudModel currentModel : pcModels) {
-            // LASPointDataRecord record = currentModel.getRecord();
-
-            currentModel.init(gl);// , minMinX, maxMaxX, minMinY, maxMaxY,
-                                  // minMinZ, maxMaxZ);
-        }
-
-        // dataFile = new
-        // File("/media/maarten/diskhdd2/Via Appia/SITES/SITE_560/SITE_560_MAX.las");
-        // LASFile lasFile = new LASFile(dataFile, 0);
-        // LASPublicHeader header = lasFile.getPublicHeader();
-        // double minX = header.getMinX();
-        // if (minX < minMinX) {
-        // minMinX = minX;
-        // }
-        // double minY = header.getMinY();
-        // if (minY < minMinY) {
-        // minMinY = minY;
-        // }
-        // double minZ = header.getMinZ();
-        // if (minZ < minMinZ) {
-        // minMinZ = minZ;
-        // }
-        // double maxX = header.getMaxX();
-        // if (maxX > maxMaxX) {
-        // maxMaxX = maxX;
-        // }
-        // double maxY = header.getMaxY();
-        // if (maxY > maxMaxY) {
-        // maxMaxY = maxY;
-        // }
-        // double maxZ = header.getMaxZ();
-        // if (maxZ > maxMaxZ) {
-        // maxMaxZ = maxZ;
+        // for (LASFile lasFile : lasFiles) {
+        // LASPointCloudModel currentModel = new LASPointCloudModel(lasFile,
+        // overallBoundingBox, skip);
+        // pcModels.add(currentModel);
         // }
         //
-        // LASPointCloudModel currentModel1 = new LASPointCloudModel(lasFile,
-        // overallBoundingBox);
-        // pcModels.add(currentModel1);
+        // for (LASPointCloudModel currentModel : pcModels) {
+        // currentModel.init(gl);
+        // }
 
         colorless = !colorDataIncluded;
 
@@ -540,6 +522,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     }
 
     private Float4Matrix makePerspectiveMatrix() {
+        frustum = new Frustum(getFovy(), getAspect(), getzNear(), getzFar(), inputHandler.getCameraPosition(),
+                inputHandler.getCameraDirection(), new Float3Vector(0f, 1f, 0f), new Float3Vector(1f, 0f, 0f));
+
         return FloatMatrixMath.perspective(getFovy(), getAspect(), getzNear(), getzFar());
     }
 
@@ -557,11 +542,27 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             // renderScatterplot(gl, mv, textShaderProgram);
             renderAxes(gl, new Float4Matrix(mv), axesShaderProgram);
 
-            if (colorless) {
-                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderColorlessProgram);
-            } else {
-                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderProgram);
-            }
+            octreeShaderProgram.setUniformMatrix("PMatrix", makePerspectiveMatrix());
+
+            Float4Matrix objectRotationMatrix = FloatMatrixMath.rotationX(-90f);
+            mv = mv.mul(objectRotationMatrix);
+            octreeShaderProgram.setUniformMatrix("MVMatrix", mv);
+            Float3Vector cameraPosition = inputHandler.getCameraPosition();
+
+            // octreeShaderProgram.setUniformMatrix("SMatrix",
+            // FloatMatrixMath.scale(1f));
+            // octreeShaderProgram.setUniformVector("Color", new
+            // Float4Vector(1f, 1f, 1f, 1f));
+            // baseBox.draw(gl, octreeShaderProgram);
+            root.draw(gl, octreeShaderProgram, cameraPosition);
+
+            // if (colorless) {
+            // renderPointCloud(gl, new Float4Matrix(mv),
+            // pointCloudShaderColorlessProgram);
+            // } else {
+            // renderPointCloud(gl, new Float4Matrix(mv),
+            // pointCloudShaderProgram);
+            // }
 
             // drawGlobe(gl, lineShaderProgram);
 

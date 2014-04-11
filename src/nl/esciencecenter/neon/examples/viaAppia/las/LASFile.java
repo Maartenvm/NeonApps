@@ -9,6 +9,7 @@ import java.nio.file.StandardOpenOption;
 import javax.media.opengl.GL3;
 
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
+import nl.esciencecenter.neon.examples.viaAppia.OctreeNode;
 import nl.esciencecenter.neon.shaders.ShaderProgram;
 
 public class LASFile {
@@ -56,6 +57,14 @@ public class LASFile {
         }
 
         return result;
+    }
+
+    public void readPointsToOctree(OctreeNode root, BoundingBox overallBoundingBox) {
+        try (FileChannel fc = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ)) {
+            pointDataRecord.addPointsToOctree(fc, publicHeader.getOffsettopointdata(), root, overallBoundingBox);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setUniforms(GL3 gl, ShaderProgram program) {

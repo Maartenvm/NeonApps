@@ -10,6 +10,8 @@ import javax.media.opengl.GL3;
 
 import nl.esciencecenter.neon.datastructures.GLSLAttribute;
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
+import nl.esciencecenter.neon.examples.viaAppia.OctreeElement;
+import nl.esciencecenter.neon.examples.viaAppia.OctreeNode;
 import nl.esciencecenter.neon.math.Float3Vector;
 
 public class LASPointDataRecord3 implements LASPointDataRecord {
@@ -232,6 +234,106 @@ public class LASPointDataRecord3 implements LASPointDataRecord {
         GLSLAttribute vertexColors = new GLSLAttribute(vertexColorsBuffer, "MCvertexColor", GLSLAttribute.SIZE_FLOAT, 3);
 
         return new VertexBufferObject(gl, vertices, vertexColors);
+    }
+
+    @Override
+    public void addPointsToOctree(FileChannel recordsBlock, long offset, OctreeNode root, BoundingBox overallBoundingBox) {
+        ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE);
+        record.order(ByteOrder.LITTLE_ENDIAN);
+
+        double scaleFactorX = publicHeader.getXscalefactor();
+        double scaleFactorY = publicHeader.getYscalefactor();
+        double scaleFactorZ = publicHeader.getZscalefactor();
+
+        double offsetX = publicHeader.getXoffset();
+        double offsetY = publicHeader.getYoffset();
+        double offsetZ = publicHeader.getZoffset();
+
+        double minX = overallBoundingBox.getMinX();
+        double minY = overallBoundingBox.getMinY();
+        double minZ = overallBoundingBox.getMinZ();
+
+        double maxX = overallBoundingBox.getMaxX();
+        double maxY = overallBoundingBox.getMaxY();
+        double maxZ = overallBoundingBox.getMaxZ();
+
+        double diffX = maxX - minX;
+        double diffY = maxY - minY;
+        double diffZ = maxZ - minZ;
+
+        double maxDiff = Math.max(Math.max(diffX, diffY), diffZ);
+
+        try {
+            for (long recordNumber = 0; recordNumber < numrecords; recordNumber++) {
+
+                record.clear();
+                recordsBlock.read(record, offset + (recordNumber * RECORD_SIZE));
+                record.flip();
+
+                double rawX = record.getInt();
+                double rawY = record.getInt();
+                double rawZ = record.getInt();
+
+                // Skip all unneeded values in input buffer
+                record.position(record.position() + 16);
+
+                byte rlow = record.get();
+                byte rhigh = record.get();
+
+                byte glow = record.get();
+                byte ghigh = record.get();
+
+                byte blow = record.get();
+                byte bhigh = record.get();
+
+                // PROCESS DATA
+                double processedX = (((((rawX * scaleFactorX) + offsetX) - minX) / maxDiff) - 0.5) * 2.0;
+                double processedY = (((((rawY * scaleFactorY) + offsetY) - minY) / maxDiff) - 0.5) * 2.0;
+                double processedZ = ((((rawZ * scaleFactorZ) + offsetZ) - minZ) / maxDiff) * 2.0;
+
+                short rint16 = (short) (((rlow & 0xFF) << 8) | (rhigh & 0xFF));
+                short gint16 = (short) (((glow & 0xFF) << 8) | (ghigh & 0xFF));
+                short bint16 = (short) (((blow & 0xFF) << 8) | (bhigh & 0xFF));
+
+                float rescaledR = (rint16 / 255f);
+                float rescaledG = (gint16 / 255f);
+                float rescaledB = (bint16 / 255f);
+
+                Float3Vector color = new Float3Vector(rescaledR, rescaledG, rescaledB);
+                // color = FloatVectorMath.increaseHue(color, 1.5f);
+
+                OctreeElement toAdd = new OctreeElement(new Float3Vector((float) processedX, (float) processedY,
+                        (float) processedZ), color);
+
+                root.addElement(toAdd);
+
+                // // WRITE DATA XYZ
+                // verticesBuffer.put((float) processedX);
+                // verticesBuffer.put((float) processedY);
+                // verticesBuffer.put((float) processedZ);
+                //
+                // // RGB
+                // vertexColorsBuffer.put(color.getX());
+                // vertexColorsBuffer.put(color.getY());
+                // vertexColorsBuffer.put(color.getZ());
+            }
+
+            recordsBlock.close();
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        // verticesBuffer.flip();
+        // vertexColorsBuffer.flip();
+        //
+        // GLSLAttribute vertices = new GLSLAttribute(verticesBuffer,
+        // "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
+        // GLSLAttribute vertexColors = new GLSLAttribute(vertexColorsBuffer,
+        // "MCvertexColor", GLSLAttribute.SIZE_FLOAT, 3);
+        //
+        // return new VertexBufferObject(gl, vertices, vertexColors);
     }
 
     @Override
