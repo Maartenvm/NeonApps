@@ -2,20 +2,19 @@ package nl.esciencecenter.neon.examples.viaAppia;
 
 import nl.esciencecenter.neon.math.Float3Vector;
 import nl.esciencecenter.neon.math.FloatVectorMath;
-import nl.esciencecenter.neon.models.BoundingBox;
 
 public class Frustum {
     private static final double DEGREESTORADIANS = Math.PI / 180.0;
-    private static int INSIDE = 2345623, OUTSIDE = 254743, INTERSECT = 92352;
-    Float3Vector pointTop;
-    Float3Vector pointBottom;
-    Float3Vector pointLeft;
-    Float3Vector pointRight;
+    private static int          INSIDE           = 2345623, OUTSIDE = 254743, INTERSECT = 92352;
+    Float3Vector                pointTop;
+    Float3Vector                pointBottom;
+    Float3Vector                pointLeft;
+    Float3Vector                pointRight;
 
-    Float3Vector normalTop;
-    Float3Vector normalBottom;
-    Float3Vector normalLeft;
-    Float3Vector normalRight;
+    Float3Vector                normalTop;
+    Float3Vector                normalBottom;
+    Float3Vector                normalLeft;
+    Float3Vector                normalRight;
 
     public Frustum(float fovy, float aspect, float zNear, float zFar, Float3Vector cameraPosition,
             Float3Vector cameraDirection, Float3Vector up, Float3Vector right) {
@@ -41,51 +40,51 @@ public class Frustum {
         normalLeft = normalLeft(cameraPosition, nearPlanePoint, up, right, wNear);
         normalRight = normalRight(cameraPosition, nearPlanePoint, up, right, wNear);
 
-        System.out.println("---");
-        System.out.println("pn:" + nearPlanePoint);
-        System.out.println("nn:" + nearPlaneNormal);
-        System.out.println("pf:" + farPlanePoint);
-        System.out.println("nf:" + farPlaneNormal);
-        System.out.println();
-        System.out.println("pt:" + pointTop);
-        System.out.println("nt:" + normalTop);
-        System.out.println("pb:" + pointBottom);
-        System.out.println("nb:" + normalBottom);
-        System.out.println("pl:" + pointLeft);
-        System.out.println("nl:" + normalLeft);
-        System.out.println("pr:" + pointRight);
-        System.out.println("nr:" + normalRight);
+        // System.out.println("---");
+        // System.out.println("pn:" + nearPlanePoint);
+        // System.out.println("nn:" + nearPlaneNormal);
+        // System.out.println("pf:" + farPlanePoint);
+        // System.out.println("nf:" + farPlaneNormal);
+        // System.out.println();
+        // System.out.println("pt:" + pointTop);
+        // System.out.println("nt:" + normalTop);
+        // System.out.println("pb:" + pointBottom);
+        // System.out.println("nb:" + normalBottom);
+        // System.out.println("pl:" + pointLeft);
+        // System.out.println("nl:" + normalLeft);
+        // System.out.println("pr:" + pointRight);
+        // System.out.println("nr:" + normalRight);
     }
 
-    int boxInFrustum(BoundingBox box) {
-        int result = INSIDE, out, in;
-
-        // for each plane do ...
-        for (int i = 0; i < 6; i++) {
-            // reset counters for corners in and out
-            out = 0;
-            in = 0;
-            // for each corner of the box do ...
-            // get out of the cycle as soon as a box as corners
-            // both inside and out of the frustum
-            for (int k = 0; k < 8 && (in == 0 || out == 0); k++) {
-                // is the corner outside or inside
-                if (pl[i].distance(b.getVertex(k)) < 0)
-                    out++;
-                else
-                    in++;
-            }
-            // if all corners are out
-            if (in == 0) {
-                return (OUTSIDE);
-            }
-            // if some corners are out and others are in
-            else if (out > 0) {
-                result = INTERSECT;
-            }
-        }
-        return (result);
-    }
+    // int boxInFrustum(BoundingBox box) {
+    // int result = INSIDE, out, in;
+    //
+    // // for each plane do ...
+    // for (int i = 0; i < 6; i++) {
+    // // reset counters for corners in and out
+    // out = 0;
+    // in = 0;
+    // // for each corner of the box do ...
+    // // get out of the cycle as soon as a box as corners
+    // // both inside and out of the frustum
+    // for (int k = 0; k < 8 && (in == 0 || out == 0); k++) {
+    // // is the corner outside or inside
+    // if (pl[i].distance(b.getVertex(k)) < 0)
+    // out++;
+    // else
+    // in++;
+    // }
+    // // if all corners are out
+    // if (in == 0) {
+    // return (OUTSIDE);
+    // }
+    // // if some corners are out and others are in
+    // else if (out > 0) {
+    // result = INTERSECT;
+    // }
+    // }
+    // return (result);
+    // }
 
     private Float3Vector farTopLeft(Float3Vector cameraPosition, Float3Vector cameraDirection, float zFar,
             Float3Vector up, float hFar, Float3Vector right, float wFar) {

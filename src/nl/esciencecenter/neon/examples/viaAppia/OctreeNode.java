@@ -29,40 +29,44 @@ import org.slf4j.LoggerFactory;
  * @author Maarten van Meersbergen <m.vanmeersbergen@esciencecenter.nl>
  */
 public class OctreeNode {
-    private final static Logger logger = LoggerFactory.getLogger(OctreeNode.class);
+    private final static Logger        logger      = LoggerFactory.getLogger(OctreeNode.class);
     /**
      * The maximum number of elements this node may contain before subdivision
      * occurs.
      */
-    protected final int maxElements;
-    /** The stored elements. */
-    protected final ArrayList<OctreeElement> elements;
+    protected static final int         maxElements = 1000;
+    protected static final int         minDivision = 7;
     /** The center location for this node. */
-    protected final Float3Vector center;
+    protected final Float3Vector       center;
     /** The size of the ribs of the cube this node represents. */
-    protected final float ribSize;
+    protected final float              ribSize;
+    protected final float              childRibSize;
     /** The depth of this node in the octree. */
-    protected final int depth;
-    /** The model to be used if this node is drawn. */
-    protected final Model model;
-    /** The translation matrix for this node. */
-    protected final Float4Matrix TMatrix;
+    protected final int                depth;
     /** The scale for this node's graphical representation. */
-    protected final float scale;
+    protected final float              scale;
 
+    /** The stored elements. */
+    protected ArrayList<OctreeElement> elements;
+    /** The model to be used if this node is drawn. */
+    protected Model                    model;
+    /** The translation matrix for this node. */
+    protected Float4Matrix             TMatrix;
     /** The (potential) child nodes. */
-    protected OctreeNode ppp, ppn, pnp, pnn, npp, npn, nnp, nnn;
+    protected OctreeNode               ppp, ppn, pnp, pnn, npp, npn, nnp, nnn;
     /** Subdivision state holder. */
-    protected boolean subdivided = false;
-    /** OpenGL initialization state holder. */
-    protected boolean initialized = false;
+    protected boolean                  subdivided  = false;
     /** State holder for finalization step. */
-    protected boolean drawable = false;
+    protected boolean                  drawable    = false;
     /** Number of points held by the final object. */
-    protected int numPoints;
+    protected int                      numPoints;
 
     /** The color for the drawable model. */
-    protected Float4Vector color;
+    protected Float4Vector             color;
+
+    protected float                    minX, maxX;
+    protected float                    minY, maxY;
+    protected float                    minZ, maxZ;
 
     /**
      * Basic constructor for OctreeNode
@@ -79,96 +83,16 @@ public class OctreeNode {
      * @param ribSize
      *            The rib sizes for the cube represented by this node.
      */
-    public OctreeNode(Model baseModel, int maxElements, int depth, Float3Vector corner, float ribSize) {
+    public OctreeNode(Model baseModel, int depth, Float3Vector corner, float ribSize) {
+        // super(VertexFormat.POINTS);
         this.model = baseModel;
-        this.maxElements = maxElements;
         this.depth = depth;
         this.center = corner.add(new Float3Vector(.5f * ribSize, .5f * ribSize, .5f * ribSize));
         this.ribSize = ribSize;
+        this.childRibSize = ribSize / 2f;
         this.TMatrix = FloatMatrixMath.translate(center);
         this.scale = ribSize / 2f;
         this.elements = new ArrayList<OctreeElement>();
-
-        // System.out.println("new node: " + center);
-    }
-
-    /**
-     * Copy constructor for OctreeNode
-     * 
-     * @param other
-     *            the node to copy.
-     */
-    public OctreeNode(OctreeNode other) {
-        this.maxElements = other.maxElements;
-        this.elements = other.elements;
-        this.center = other.center;
-        this.ribSize = other.ribSize;
-        this.depth = other.depth;
-        this.model = other.model;
-        this.TMatrix = other.TMatrix;
-        this.scale = other.scale;
-
-        this.ppp = other.ppp;
-        this.ppn = other.ppn;
-        this.pnp = other.pnp;
-        this.pnn = other.pnn;
-        this.npp = other.npp;
-        this.npn = other.npn;
-        this.nnp = other.nnp;
-        this.nnn = other.nnn;
-        this.initialized = other.initialized;
-        this.subdivided = other.subdivided;
-        this.drawable = other.drawable;
-        this.color = other.color;
-    }
-
-    /**
-     * OpenGL initialization method.
-     * 
-     * @param gl
-     *            the currently bound GL instance.
-     */
-    public void init(GL3 gl) {
-        if (!initialized) {
-            model.init(gl);
-
-            if (subdivided) {
-                ppp.init(gl);
-                ppn.init(gl);
-                pnp.init(gl);
-                pnn.init(gl);
-                npp.init(gl);
-                npn.init(gl);
-                nnp.init(gl);
-                nnn.init(gl);
-            }
-        }
-
-        initialized = true;
-    }
-
-    /**
-     * Deletion method for this octree node. Cleans up any used memory. Since
-     * only one model is used, this needs to delete only once.
-     * 
-     * @param gl
-     *            the currently bound GL instance.
-     */
-    public void delete(GL3 gl) {
-        if (initialized) {
-            model.delete(gl);
-
-            // if (subdivided) {
-            // ppp.delete(gl);
-            // ppn.delete(gl);
-            // pnp.delete(gl);
-            // pnn.delete(gl);
-            // npp.delete(gl);
-            // npn.delete(gl);
-            // nnp.delete(gl);
-            // nnn.delete(gl);
-            // }
-        }
     }
 
     /**
@@ -177,30 +101,37 @@ public class OctreeNode {
      * a throughput, delegating all calls to its children.
      */
     protected void subdivide() {
-        float childRibSize = ribSize / 2f;
-        int newDepth = depth + 1;
-
-        ppp = new OctreeNode(model, maxElements, newDepth, center.add(new Float3Vector(0f, 0f, 0f)), childRibSize);
-        ppn = new OctreeNode(model, maxElements, newDepth, center.add(new Float3Vector(0f, 0f, -childRibSize)),
-                childRibSize);
-        pnp = new OctreeNode(model, maxElements, newDepth, center.add(new Float3Vector(0f, -childRibSize, 0f)),
-                childRibSize);
-        pnn = new OctreeNode(model, maxElements, newDepth,
-                center.add(new Float3Vector(0f, -childRibSize, -childRibSize)), childRibSize);
-        npp = new OctreeNode(model, maxElements, newDepth, center.add(new Float3Vector(-childRibSize, 0f, 0f)),
-                childRibSize);
-        npn = new OctreeNode(model, maxElements, newDepth,
-                center.add(new Float3Vector(-childRibSize, 0f, -childRibSize)), childRibSize);
-        nnp = new OctreeNode(model, maxElements, newDepth,
-                center.add(new Float3Vector(-childRibSize, -childRibSize, 0f)), childRibSize);
-        nnn = new OctreeNode(model, maxElements, newDepth, center.add(new Float3Vector(-childRibSize, -childRibSize,
-                -childRibSize)), childRibSize);
+        // float childRibSize = ribSize / 2f;
+        // int newDepth = depth + 1;
+        //
+        // ppp = new OctreeNode(model, newDepth, center.add(new Float3Vector(0f,
+        // 0f, 0f)), childRibSize);
+        // ppn = new OctreeNode(model, newDepth, center.add(new Float3Vector(0f,
+        // 0f, -childRibSize)), childRibSize);
+        // pnp = new OctreeNode(model, newDepth, center.add(new Float3Vector(0f,
+        // -childRibSize, 0f)), childRibSize);
+        // pnn = new OctreeNode(model, newDepth, center.add(new Float3Vector(0f,
+        // -childRibSize, -childRibSize)),
+        // childRibSize);
+        // npp = new OctreeNode(model, newDepth, center.add(new
+        // Float3Vector(-childRibSize, 0f, 0f)), childRibSize);
+        // npn = new OctreeNode(model, newDepth, center.add(new
+        // Float3Vector(-childRibSize, 0f, -childRibSize)),
+        // childRibSize);
+        // nnp = new OctreeNode(model, newDepth, center.add(new
+        // Float3Vector(-childRibSize, -childRibSize, 0f)),
+        // childRibSize);
+        // nnn = new OctreeNode(model, newDepth,
+        // center.add(new Float3Vector(-childRibSize, -childRibSize,
+        // -childRibSize)), childRibSize);
 
         for (OctreeElement element : elements) {
             addElementSubdivided(element);
         }
 
-        elements.clear();
+        // this.model = null;
+        this.TMatrix = null;
+        this.elements = null;
 
         subdivided = true;
     }
@@ -241,14 +172,18 @@ public class OctreeNode {
         // the domain governed by this octree.
         if (depth > 0 || isInThisNodesSpace(location)) {
             // Check if we are full yet.
-            if (!subdivided && (elements.size() > maxElements)) {
-                if (depth < Settings.getInstance().getMaxOctreeDepth()) {
-                    // If so, subdivide this node.
+            if (!subdivided) {
+                if (depth < minDivision) {
                     subdivide();
-                } else {
-                    // Or generate a warning if there is something wrong.
-                    // (insane total number of elements added f.e.)
-                    logger.warn("Octree max division reached.");
+                } else if (elements.size() > maxElements) {
+                    if (depth < Settings.getInstance().getMaxOctreeDepth()) {
+                        // If so, subdivide this node.
+                        subdivide();
+                    } else {
+                        // Or generate a warning if there is something wrong.
+                        // (insane total number of elements added f.e.)
+                        logger.warn("Octree max division reached.");
+                    }
                 }
             }
 
@@ -272,44 +207,63 @@ public class OctreeNode {
      * transparent white based on population density compared to
      * {@link #maxElements}. Override this.
      */
-    public void finalizeAdding() {
+    public void finalizeAdding(GL3 gl) {
         if (subdivided) {
-            ppp.finalizeAdding();
-            ppn.finalizeAdding();
-            pnp.finalizeAdding();
-            pnn.finalizeAdding();
-            npp.finalizeAdding();
-            npn.finalizeAdding();
-            nnp.finalizeAdding();
-            nnn.finalizeAdding();
+            if (ppp != null) {
+                ppp.finalizeAdding(gl);
+            }
+            if (ppn != null) {
+                ppn.finalizeAdding(gl);
+            }
+            if (pnp != null) {
+                pnp.finalizeAdding(gl);
+            }
+            if (pnn != null) {
+                pnn.finalizeAdding(gl);
+            }
+            if (npp != null) {
+                npp.finalizeAdding(gl);
+            }
+            if (npn != null) {
+                npn.finalizeAdding(gl);
+            }
+            if (nnp != null) {
+                nnp.finalizeAdding(gl);
+            }
+            if (nnn != null) {
+                nnn.finalizeAdding(gl);
+            }
 
-            numPoints += ppp.getNumPoints();
-            numPoints += ppn.getNumPoints();
-            numPoints += pnp.getNumPoints();
-            numPoints += pnn.getNumPoints();
-            numPoints += npp.getNumPoints();
-            numPoints += npn.getNumPoints();
-            numPoints += nnp.getNumPoints();
-            numPoints += nnn.getNumPoints();
-
-            Float4Vector protoColor = new Float4Vector(0f, 0f, 0f, 0f);
-
-            protoColor = protoColor.add(ppp.getColor());
-            protoColor = protoColor.add(ppn.getColor());
-            protoColor = protoColor.add(pnp.getColor());
-            protoColor = protoColor.add(pnn.getColor());
-            protoColor = protoColor.add(npp.getColor());
-            protoColor = protoColor.add(npn.getColor());
-            protoColor = protoColor.add(nnp.getColor());
-            protoColor = protoColor.add(nnn.getColor());
-
-            protoColor = protoColor.div(numPoints);
-
-            color = new Float4Vector(protoColor.getX(), protoColor.getY(), protoColor.getZ(), 1f);
+            // numPoints += ppp.getNumPoints();
+            // numPoints += ppn.getNumPoints();
+            // numPoints += pnp.getNumPoints();
+            // numPoints += pnn.getNumPoints();
+            // numPoints += npp.getNumPoints();
+            // numPoints += npn.getNumPoints();
+            // numPoints += nnp.getNumPoints();
+            // numPoints += nnn.getNumPoints();
+            //
+            // Float4Vector protoColor = new Float4Vector(0f, 0f, 0f, 0f);
+            //
+            // protoColor = protoColor.add(ppp.getColor());
+            // protoColor = protoColor.add(ppn.getColor());
+            // protoColor = protoColor.add(pnp.getColor());
+            // protoColor = protoColor.add(pnn.getColor());
+            // protoColor = protoColor.add(npp.getColor());
+            // protoColor = protoColor.add(npn.getColor());
+            // protoColor = protoColor.add(nnp.getColor());
+            // protoColor = protoColor.add(nnn.getColor());
+            //
+            // protoColor = protoColor.div(numPoints);
+            //
+            // color = new Float4Vector(protoColor.getX(), protoColor.getY(),
+            // protoColor.getZ(), 1f);
 
             drawable = true;
         } else {
             if (elements.size() > 0) {
+                // if (elements.size() > 2 *
+                // (Settings.getInstance().getMaxOctreeDepth() - depth)) {
                 Float3Vector protoColor = new Float3Vector(0f, 0f, 0f);
                 for (OctreeElement element : elements) {
                     protoColor = protoColor.add(element.getColor());
@@ -320,11 +274,46 @@ public class OctreeNode {
 
                 numPoints = elements.size();
 
+                // FloatBuffer verticesBuffer =
+                // FloatBuffer.allocate(numPoints * 3);
+                // FloatBuffer vertexColorsBuffer =
+                // FloatBuffer.allocate(numPoints * 3);
+                //
+                // for (OctreeElement element : elements) {
+                // Float3Vector location = element.getCenter();
+                // Float3Vector color = element.getColor();
+                // // WRITE DATA XYZ
+                // verticesBuffer.put(location.getX());
+                // verticesBuffer.put(location.getY());
+                // verticesBuffer.put(location.getZ());
+                //
+                // // RGB
+                // vertexColorsBuffer.put(color.getX());
+                // vertexColorsBuffer.put(color.getY());
+                // vertexColorsBuffer.put(color.getZ());
+                // }
+                //
+                // verticesBuffer.flip();
+                // vertexColorsBuffer.flip();
+                //
+                // GLSLAttribute vertices = new
+                // GLSLAttribute(verticesBuffer, "MCvertex",
+                // GLSLAttribute.SIZE_FLOAT, 3);
+                // GLSLAttribute vertexColors = new
+                // GLSLAttribute(vertexColorsBuffer, "MCvertexColor",
+                // GLSLAttribute.SIZE_FLOAT, 3);
+                //
+                // VertexBufferObject vbo = new VertexBufferObject(gl,
+                // vertices, vertexColors);
+                // setVbo(vbo);
+                // setNumVertices(numPoints);
+
                 drawable = true;
             }
+            // }
         }
 
-        elements.clear();
+        elements = null;
     }
 
     protected Float4Vector getColor() {
@@ -350,28 +339,60 @@ public class OctreeNode {
         if (location.getX() < center.getX()) {
             if (location.getY() < center.getY()) {
                 if (location.getZ() < center.getZ()) {
+                    if (nnn == null) {
+                        nnn = new OctreeNode(model, depth + 1, center.add(new Float3Vector(-childRibSize,
+                                -childRibSize, -childRibSize)), childRibSize);
+
+                    }
                     nnn.addElement(element);
                 } else {
+                    if (nnp == null) {
+                        nnp = new OctreeNode(model, depth + 1, center.add(new Float3Vector(-childRibSize,
+                                -childRibSize, 0f)), childRibSize);
+                    }
                     nnp.addElement(element);
                 }
             } else {
                 if (location.getZ() < center.getZ()) {
+                    if (npn == null) {
+                        npn = new OctreeNode(model, depth + 1, center.add(new Float3Vector(-childRibSize, 0f,
+                                -childRibSize)), childRibSize);
+                    }
                     npn.addElement(element);
                 } else {
+                    if (npp == null) {
+                        npp = new OctreeNode(model, depth + 1, center.add(new Float3Vector(-childRibSize, 0f, 0f)),
+                                childRibSize);
+                    }
                     npp.addElement(element);
                 }
             }
         } else {
             if (location.getY() < center.getY()) {
                 if (location.getZ() < center.getZ()) {
+                    if (pnn == null) {
+                        pnn = new OctreeNode(model, depth + 1, center.add(new Float3Vector(0f, -childRibSize,
+                                -childRibSize)), childRibSize);
+                    }
                     pnn.addElement(element);
                 } else {
+                    if (pnp == null) {
+                        pnp = new OctreeNode(model, depth + 1, center.add(new Float3Vector(0f, -childRibSize, 0f)),
+                                childRibSize);
+                    }
                     pnp.addElement(element);
                 }
             } else {
                 if (location.getZ() < center.getZ()) {
+                    if (ppn == null) {
+                        ppn = new OctreeNode(model, depth + 1, center.add(new Float3Vector(0f, 0f, -childRibSize)),
+                                childRibSize);
+                    }
                     ppn.addElement(element);
                 } else {
+                    if (ppp == null) {
+                        ppp = new OctreeNode(model, depth + 1, center.add(new Float3Vector(0f, 0f, 0f)), childRibSize);
+                    }
                     ppp.addElement(element);
                 }
             }
@@ -393,24 +414,35 @@ public class OctreeNode {
      *             {@link #init(GL3)} method.
      */
     public void draw(GL3 gl, ShaderProgram program, Float3Vector cameraPosition) throws UninitializedException {
-        if (initialized) {
-            if (subdivided) {
-                draw_sorted(gl, program, cameraPosition);
-            } else {
-                if (drawable) {
-                    // Float4Matrix newM = MVMatrix.mul(TMatrix);
-                    program.setUniformMatrix("TMatrix", TMatrix);
-                    program.setUniformMatrix("SMatrix", FloatMatrixMath.scale(scale));
-                    program.setUniformVector("Color", color);
-
-                    program.use(gl);
-
-                    model.draw(gl, program);
-                }
-            }
+        // if (initialized) {
+        if (subdivided) {
+            draw_sorted(gl, program, cameraPosition);
         } else {
-            throw new UninitializedException();
+            if (drawable) {
+                program.setUniformMatrix("TMatrix", TMatrix);
+                program.setUniformMatrix("SMatrix", FloatMatrixMath.scale(scale));
+                program.setUniformVector("Color", color);
+
+                program.use(gl);
+
+                model.draw(gl, program);
+
+                // try {
+                // program.use(gl);
+                // } catch (UninitializedException e) {
+                // logger.error(e.getMessage());
+                // }
+                //
+                // getVbo().bind(gl);
+                //
+                // program.linkAttribs(gl, getVbo().getAttribs());
+                //
+                // gl.glDrawArrays(GL3.GL_POINTS, 0, getNumVertices());
+            }
         }
+        // } else {
+        // throw new UninitializedException();
+        // }
     }
 
     /**
@@ -430,17 +462,32 @@ public class OctreeNode {
         try {
             // if (inputHandler.getCurrentViewOctant() ==
             // InputHandler.octants.NNN) {
-            ppp.draw(gl, program, cameraPosition);
 
-            npp.draw(gl, program, cameraPosition);
-            pnp.draw(gl, program, cameraPosition);
-            ppn.draw(gl, program, cameraPosition);
+            if (ppp != null) {
+                ppp.draw(gl, program, cameraPosition);
+            }
+            if (ppn != null) {
+                ppn.draw(gl, program, cameraPosition);
+            }
+            if (pnp != null) {
+                pnp.draw(gl, program, cameraPosition);
+            }
+            if (pnn != null) {
+                pnn.draw(gl, program, cameraPosition);
+            }
+            if (npp != null) {
+                npp.draw(gl, program, cameraPosition);
+            }
+            if (npn != null) {
+                npn.draw(gl, program, cameraPosition);
+            }
+            if (nnp != null) {
+                nnp.draw(gl, program, cameraPosition);
+            }
+            if (nnn != null) {
+                nnn.draw(gl, program, cameraPosition);
+            }
 
-            nnp.draw(gl, program, cameraPosition);
-            pnn.draw(gl, program, cameraPosition);
-            npn.draw(gl, program, cameraPosition);
-
-            nnn.draw(gl, program, cameraPosition);
             // } else if (inputHandler.getCurrentViewOctant() ==
             // InputHandler.octants.NNP) {
             // ppn.draw(gl, program, MVMatrix);

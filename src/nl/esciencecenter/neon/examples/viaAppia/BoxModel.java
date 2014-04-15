@@ -138,9 +138,9 @@ public class BoxModel extends Model {
         float z1 = 1f;
         float z0 = -1f;
 
-        Point4[] result = new Point4[] { new Point4(x0, y0, z0), new Point4(x1, y0, z0), new Point4(x0, y0, z1),
-                new Point4(x1, y0, z1), new Point4(x0, y1, z0), new Point4(x1, y1, z0), new Point4(x0, y1, z1),
-                new Point4(x1, y1, z1) };
+        Point4[] result = new Point4[] { new Point4(x0, y0, z1), new Point4(x1, y0, z1), new Point4(x0, y0, z0),
+                new Point4(x1, y0, z0), new Point4(x0, y1, z1), new Point4(x1, y1, z1), new Point4(x0, y1, z0),
+                new Point4(x1, y1, z0) };
 
         return result;
     }

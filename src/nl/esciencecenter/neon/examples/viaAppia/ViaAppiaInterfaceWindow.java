@@ -44,10 +44,10 @@ import nl.esciencecenter.neon.swing.GoggleSwing;
  */
 public class ViaAppiaInterfaceWindow extends JPanel {
     // A serialVersionUID is 'needed' because we extend JPanel.
-    private static final long serialVersionUID = 1L;
+    private static final long      serialVersionUID = 1L;
 
     // Global (singleton) settings instance.
-    private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
+    private final ViaAppiaSettings settings         = ViaAppiaSettings.getInstance();
 
     /**
      * Basic constructor for ESightExampleInterfaceWindow.
@@ -100,7 +100,7 @@ public class ViaAppiaInterfaceWindow extends JPanel {
     }
 
     private File[] openFile() {
-        final JFileChooser fileChooser = new JFileChooser("/media/maarten/diskhdd2/Via Appia/");
+        final JFileChooser fileChooser = new JFileChooser("D:/Via Appia");
 
         fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
         fileChooser.setMultiSelectionEnabled(true);

@@ -10,15 +10,16 @@ import javax.media.opengl.GL3;
 
 import nl.esciencecenter.neon.datastructures.VertexBufferObject;
 import nl.esciencecenter.neon.examples.viaAppia.OctreeNode;
+import nl.esciencecenter.neon.examples.viaAppia.PPOctreeNode;
 import nl.esciencecenter.neon.shaders.ShaderProgram;
 
 public class LASFile {
-    private LASPublicHeader publicHeader;
+    private LASPublicHeader           publicHeader;
     private LASVariableLengthRecord[] variableLengthRecords;
 
-    private LASPointDataRecord pointDataRecord;
+    private LASPointDataRecord        pointDataRecord;
 
-    private final File dataFile;
+    private final File                dataFile;
 
     public LASFile(File dataFile) {
         this.dataFile = dataFile;
@@ -76,5 +77,13 @@ public class LASFile {
 
     public LASPublicHeader getPublicHeader() {
         return publicHeader;
+    }
+
+    public void readPointsToOctree(PPOctreeNode root, BoundingBox overallBoundingBox) {
+        try (FileChannel fc = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ)) {
+            pointDataRecord.addPointsToOctree(fc, publicHeader.getOffsettopointdata(), root, overallBoundingBox);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

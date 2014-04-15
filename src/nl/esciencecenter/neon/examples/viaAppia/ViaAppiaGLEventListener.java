@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.media.opengl.GL;
+import javax.media.opengl.GL2ES1;
 import javax.media.opengl.GL3;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLContext;
@@ -56,59 +57,62 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class ViaAppiaGLEventListener extends NeonGLEventListener {
-    private final static Logger LOGGER = LoggerFactory.getLogger(ViaAppiaGLEventListener.class);
-    private final long MAX_POINTS = 2500000;
+    private final static Logger        logger           = LoggerFactory.getLogger(ViaAppiaGLEventListener.class);
+    private final long                 MAX_POINTS       = 2500000;
 
     // Two example shader program definitions.
-    private ShaderProgram axesShaderProgram, textShaderProgram, lineShaderProgram, pointCloudShaderProgram,
-            pointCloudShaderColorlessProgram, octreeShaderProgram;
+    private ShaderProgram              axesShaderProgram, textShaderProgram, lineShaderProgram,
+            pointCloudShaderProgram, pointCloudShaderColorlessProgram, octreeShaderProgram;
 
     // Model definitions, the quad is necessary for Full-screen rendering. The
     // axes are the model we wish to render (example)
-    private Model xAxis, yAxis, zAxis;
+    private Model                      xAxis, yAxis, zAxis;
 
     // private ScatBuilder scatBuilder;
     // private ScatterPlot3D scat;
-    private List<LASPointCloudModel> pcModels;
+    private List<LASPointCloudModel>   pcModels;
 
     // Global (singleton) settings instance.
-    private final ViaAppiaSettings settings = ViaAppiaSettings.getInstance();
+    private final ViaAppiaSettings     settings         = ViaAppiaSettings.getInstance();
 
     // Pixelbuffer Object, we use this to get screenshots.
-    private IntPixelBufferObject finalPBO;
+    private IntPixelBufferObject       finalPBO;
 
     // Global (singleton) inputhandler instance.
-    private final ViaAppiaInputHandler inputHandler = ViaAppiaInputHandler.getInstance();
+    private final ViaAppiaInputHandler inputHandler     = ViaAppiaInputHandler.getInstance();
 
     // State keeping variable
-    private boolean screenshotWanted;
+    private boolean                    screenshotWanted;
 
     // Height and width of the drawable area. We extract this from the opengl
     // instance in the reshape method every time it is changed, but set it in
     // the init method initially. The default values are defined by the settings
     // class.
-    private int canvasWidth, canvasHeight;
+    private int                        canvasWidth, canvasHeight;
 
     // Variables needed to calculate the viewpoint and camera angle.
-    final Point4 eye = new Point4((float) (getRadius() * Math.sin(getFtheta()) * Math.cos(getPhi())),
-            (float) (getRadius() * Math.sin(getFtheta()) * Math.sin(getPhi())),
-            (float) (getRadius() * Math.cos(getFtheta())));
-    final Point4 at = new Point4(0.0f, 0.0f, 0.0f);
-    final Float4Vector up = new Float4Vector(0.0f, 1.0f, 0.0f, 0.0f);
+    final Point4                       eye              = new Point4(
+                                                                (float) (getRadius() * Math.sin(getFtheta()) * Math
+                                                                        .cos(getPhi())),
+                                                                (float) (getRadius() * Math.sin(getFtheta()) * Math
+                                                                        .sin(getPhi())), (float) (getRadius() * Math
+                                                                        .cos(getFtheta())));
+    final Point4                       at               = new Point4(0.0f, 0.0f, 0.0f);
+    final Float4Vector                 up               = new Float4Vector(0.0f, 1.0f, 0.0f, 0.0f);
 
-    private final Float3Vector clickTranslation = new Float3Vector();
+    private final Float3Vector         clickTranslation = new Float3Vector();
 
-    private Sphere clickSphere;
+    private Sphere                     clickSphere;
 
-    private GeoSphere globe;
+    private GeoSphere                  globe;
 
-    int filesToLoad = 105;
+    int                                filesToLoad      = 105;
 
-    private boolean colorless = false;
+    private boolean                    colorless        = false;
 
-    private OctreeNode root;
-    private BoxModel baseBox;
-    private Frustum frustum;
+    private OctreeNode                 root;
+    private BoxModel                   baseBox;
+    private Frustum                    frustum;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -146,6 +150,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
         // Enable Anti-Aliasing (smoothing of jagged edges on the edges of
         // objects).
+        gl.glEnable(GL2ES1.GL_POINT_SMOOTH);
+        gl.glHint(GL2ES1.GL_POINT_SMOOTH_HINT, GL3.GL_NICEST);
         gl.glEnable(GL3.GL_LINE_SMOOTH);
         gl.glHint(GL3.GL_LINE_SMOOTH_HINT, GL3.GL_NICEST);
         gl.glEnable(GL3.GL_POLYGON_SMOOTH);
@@ -162,8 +168,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         gl.glCullFace(GL3.GL_BACK);
 
         // Enable Blending (needed for both Transparency and Anti-Aliasing)
-        gl.glBlendFunc(GL3.GL_SRC_ALPHA, GL3.GL_ONE_MINUS_SRC_ALPHA);
-        gl.glEnable(GL3.GL_BLEND);
+        // gl.glBlendFunc(GL3.GL_SRC_ALPHA, GL3.GL_ONE_MINUS_SRC_ALPHA);
+        // gl.glEnable(GL3.GL_BLEND);
 
         // Enable Vertical Sync
         gl.setSwapInterval(1);
@@ -174,6 +180,9 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         // Enable programmatic setting of point size, for rendering points (not
         // needed for this example application).
         gl.glEnable(GL3.GL_PROGRAM_POINT_SIZE);
+
+        gl.glEnable(GL3.GL_MULTISAMPLE);
+        // gl.glEnable(GL3.GL_POINT_SMOOTH);
 
         // Load and compile shaders from source Files (there are other options;
         // check the ShaderProgram Javadoc).
@@ -484,12 +493,11 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         System.out.println("Number of records: " + totalRecords);
         System.out.println("Skipping         : " + skip);
 
-        root = new OctreeNode(baseBox, 100, 0, new Float3Vector(-1f, -1f, -1f), 2f);
+        root = new OctreeNode(baseBox, 0, new Float3Vector(-1f, -1f, -1f), 2f);
         for (LASFile lasFile : lasFiles) {
             lasFile.readPointsToOctree(root, overallBoundingBox);
         }
-        root.finalizeAdding();
-        root.init(gl);
+        root.finalizeAdding(gl);
 
         // for (LASFile lasFile : lasFiles) {
         // LASPointCloudModel currentModel = new LASPointCloudModel(lasFile,
@@ -542,18 +550,28 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             // renderScatterplot(gl, mv, textShaderProgram);
             renderAxes(gl, new Float4Matrix(mv), axesShaderProgram);
 
-            octreeShaderProgram.setUniformMatrix("PMatrix", makePerspectiveMatrix());
-
             Float4Matrix objectRotationMatrix = FloatMatrixMath.rotationX(-90f);
             mv = mv.mul(objectRotationMatrix);
-            octreeShaderProgram.setUniformMatrix("MVMatrix", mv);
             Float3Vector cameraPosition = inputHandler.getCameraPosition();
 
-            // octreeShaderProgram.setUniformMatrix("SMatrix",
-            // FloatMatrixMath.scale(1f));
-            // octreeShaderProgram.setUniformVector("Color", new
-            // Float4Vector(1f, 1f, 1f, 1f));
-            // baseBox.draw(gl, octreeShaderProgram);
+            // pointCloudShaderProgram.setUniformMatrix("MVMatrix", mv);
+            // pointCloudShaderProgram.setUniformMatrix("PMatrix",
+            // makePerspectiveMatrix());
+            // pointCloudShaderProgram.setUniformVector("cameraPos",
+            // inputHandler.getCameraPosition());
+            // pointCloudShaderProgram.setUniform("hue",
+            // settings.getHueFactor());
+            // pointCloudShaderProgram.setUniform("saturation",
+            // settings.getSaturationFactor());
+            //
+            // root.draw(gl, pointCloudShaderProgram, cameraPosition);
+
+            octreeShaderProgram.setUniformMatrix("MVMatrix", mv);
+            octreeShaderProgram.setUniformMatrix("PMatrix", makePerspectiveMatrix());
+            octreeShaderProgram.setUniformVector("cameraPos", inputHandler.getCameraPosition());
+            octreeShaderProgram.setUniform("hue", settings.getHueFactor());
+            octreeShaderProgram.setUniform("saturation", settings.getSaturationFactor());
+
             root.draw(gl, octreeShaderProgram, cameraPosition);
 
             // if (colorless) {
