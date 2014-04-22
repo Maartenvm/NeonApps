@@ -19,8 +19,8 @@ uniform mat4 MVMatrix;
 //uniform double minZ;
 //uniform double diffX;
 
-uniform float hue;
-uniform float saturation;
+//uniform float hue;
+//uniform float saturation;
 
 uniform vec3 cameraPos;
 
@@ -150,9 +150,9 @@ void main() {
 	
 	
 	vec3 color = vec3(MCvertexColor.r ,MCvertexColor.g ,MCvertexColor.b);
-	RGBtoHSV( color );
-	color = vec3(color.r*hue, color.g*saturation, color.b);
-	HSVtoRGB( color );
+	//RGBtoHSV( color );
+	//color = vec3(color.r*hue, color.g*saturation, color.b);
+	//HSVtoRGB( color );
 	
 	vertexColor = vec4(color.r ,color.g ,color.b, 1.0);
 	//vertexColor = vec4(1.0, 1.0, 1.0, 1.0);

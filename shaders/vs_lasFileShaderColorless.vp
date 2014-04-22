@@ -18,8 +18,8 @@ uniform mat4 MVMatrix;
 //uniform double minZ;
 //uniform double diffX;
 
-uniform float hue;
-uniform float saturation;
+//uniform float hue;
+//uniform float saturation;
 
 uniform vec3 cameraPos;
 

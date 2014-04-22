@@ -1,9 +1,13 @@
 package nl.esciencecenter.neon.examples.viaAppia;
 
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.media.opengl.GL3;
 
+import nl.esciencecenter.neon.datastructures.GLSLAttribute;
+import nl.esciencecenter.neon.datastructures.VertexBufferObject;
 import nl.esciencecenter.neon.exceptions.UninitializedException;
 import nl.esciencecenter.neon.input.InputHandler;
 import nl.esciencecenter.neon.math.Float3Vector;
@@ -34,8 +38,8 @@ public class OctreeNode {
      * The maximum number of elements this node may contain before subdivision
      * occurs.
      */
-    protected static final int         maxElements = 1000;
-    protected static final int         minDivision = 7;
+    protected static final int         maxElements = 1000000;
+    protected static final int         minDivision = 0;
     /** The center location for this node. */
     protected final Float3Vector       center;
     /** The size of the ribs of the cube this node represents. */
@@ -68,6 +72,9 @@ public class OctreeNode {
     protected float                    minY, maxY;
     protected float                    minZ, maxZ;
 
+    private VertexBufferObject         vbo;
+    private int                        numVertices;
+
     /**
      * Basic constructor for OctreeNode
      * 
@@ -86,6 +93,30 @@ public class OctreeNode {
     public OctreeNode(Model baseModel, int depth, Float3Vector corner, float ribSize) {
         // super(VertexFormat.POINTS);
         this.model = baseModel;
+        this.depth = depth;
+        this.center = corner.add(new Float3Vector(.5f * ribSize, .5f * ribSize, .5f * ribSize));
+        this.ribSize = ribSize;
+        this.childRibSize = ribSize / 2f;
+        this.TMatrix = FloatMatrixMath.translate(center);
+        this.scale = ribSize / 2f;
+        this.elements = new ArrayList<OctreeElement>();
+    }
+
+    /**
+     * Basic constructor for OctreeNode
+     * 
+     * @param maxElements
+     *            The maximum amount of {@link OctreeElement}s for this node.
+     * @param depth
+     *            The depth for this node in the octree (root = 0).
+     * @param corner
+     *            The corner location for the lower X, Y, Z values of the cube
+     *            represented by this node.
+     * @param ribSize
+     *            The rib sizes for the cube represented by this node.
+     */
+    public OctreeNode(int depth, Float3Vector corner, float ribSize) {
+        // super(VertexFormat.POINTS);
         this.depth = depth;
         this.center = corner.add(new Float3Vector(.5f * ribSize, .5f * ribSize, .5f * ribSize));
         this.ribSize = ribSize;
@@ -264,49 +295,43 @@ public class OctreeNode {
             if (elements.size() > 0) {
                 // if (elements.size() > 2 *
                 // (Settings.getInstance().getMaxOctreeDepth() - depth)) {
-                Float3Vector protoColor = new Float3Vector(0f, 0f, 0f);
-                for (OctreeElement element : elements) {
-                    protoColor = protoColor.add(element.getColor());
-                }
-                protoColor = protoColor.div(elements.size());
-
-                color = new Float4Vector(protoColor.getX(), protoColor.getY(), protoColor.getZ(), 1f);
+                // Float3Vector protoColor = new Float3Vector(0f, 0f, 0f);
+                // for (OctreeElement element : elements) {
+                // protoColor = protoColor.add(element.getColor());
+                // }
+                // protoColor = protoColor.div(elements.size());
+                //
+                // color = new Float4Vector(protoColor.getX(),
+                // protoColor.getY(), protoColor.getZ(), 1f);
 
                 numPoints = elements.size();
 
-                // FloatBuffer verticesBuffer =
-                // FloatBuffer.allocate(numPoints * 3);
-                // FloatBuffer vertexColorsBuffer =
-                // FloatBuffer.allocate(numPoints * 3);
-                //
-                // for (OctreeElement element : elements) {
-                // Float3Vector location = element.getCenter();
-                // Float3Vector color = element.getColor();
-                // // WRITE DATA XYZ
-                // verticesBuffer.put(location.getX());
-                // verticesBuffer.put(location.getY());
-                // verticesBuffer.put(location.getZ());
-                //
-                // // RGB
-                // vertexColorsBuffer.put(color.getX());
-                // vertexColorsBuffer.put(color.getY());
-                // vertexColorsBuffer.put(color.getZ());
-                // }
-                //
-                // verticesBuffer.flip();
-                // vertexColorsBuffer.flip();
-                //
-                // GLSLAttribute vertices = new
-                // GLSLAttribute(verticesBuffer, "MCvertex",
-                // GLSLAttribute.SIZE_FLOAT, 3);
-                // GLSLAttribute vertexColors = new
-                // GLSLAttribute(vertexColorsBuffer, "MCvertexColor",
-                // GLSLAttribute.SIZE_FLOAT, 3);
-                //
-                // VertexBufferObject vbo = new VertexBufferObject(gl,
-                // vertices, vertexColors);
-                // setVbo(vbo);
-                // setNumVertices(numPoints);
+                FloatBuffer verticesBuffer = FloatBuffer.allocate(numPoints * 3);
+                FloatBuffer vertexColorsBuffer = FloatBuffer.allocate(numPoints * 3);
+
+                for (OctreeElement element : elements) {
+                    Float3Vector location = element.getCenter();
+                    Float3Vector color = element.getColor();
+                    // WRITE DATA XYZ
+                    verticesBuffer.put(location.getX());
+                    verticesBuffer.put(location.getY());
+                    verticesBuffer.put(location.getZ());
+
+                    // RGB
+                    vertexColorsBuffer.put(color.getX());
+                    vertexColorsBuffer.put(color.getY());
+                    vertexColorsBuffer.put(color.getZ());
+                }
+
+                verticesBuffer.flip();
+                vertexColorsBuffer.flip();
+
+                GLSLAttribute vertices = new GLSLAttribute(verticesBuffer, "MCvertex", GLSLAttribute.SIZE_FLOAT, 3);
+                GLSLAttribute vertexColors = new GLSLAttribute(vertexColorsBuffer, "MCvertexColor",
+                        GLSLAttribute.SIZE_FLOAT, 3);
+
+                vbo = new VertexBufferObject(gl, vertices, vertexColors);
+                numVertices = numPoints;
 
                 drawable = true;
             }
@@ -316,12 +341,207 @@ public class OctreeNode {
         elements = null;
     }
 
+    protected int getNumLeaves() {
+        int result = 0;
+        if (subdivided) {
+            if (ppp != null) {
+                result += ppp.getNumLeaves();
+            }
+            if (ppn != null) {
+                result += ppn.getNumLeaves();
+            }
+            if (pnp != null) {
+                result += pnp.getNumLeaves();
+            }
+            if (pnn != null) {
+                result += pnn.getNumLeaves();
+            }
+            if (npp != null) {
+                result += npp.getNumLeaves();
+            }
+            if (npn != null) {
+                result += npn.getNumLeaves();
+            }
+            if (nnp != null) {
+                result += nnp.getNumLeaves();
+            }
+            if (nnn != null) {
+                result += nnn.getNumLeaves();
+            }
+        } else {
+            result = 1;
+        }
+        return result;
+    }
+
+    protected List<BarebonesModel> getModels() {
+        List<BarebonesModel> result = new ArrayList<BarebonesModel>();
+        if (getNumLeaves() < 100) {
+            result.add(new BarebonesModel(getLeafTriangles()));
+        } else {
+            if (subdivided) {
+                if (ppp != null) {
+                    result.addAll(ppp.getModels());
+                }
+                if (ppn != null) {
+                    result.addAll(ppn.getModels());
+                }
+                if (pnp != null) {
+                    result.addAll(pnp.getModels());
+                }
+                if (pnn != null) {
+                    result.addAll(pnn.getModels());
+                }
+                if (npp != null) {
+                    result.addAll(npp.getModels());
+                }
+                if (npn != null) {
+                    result.addAll(npn.getModels());
+                }
+                if (nnp != null) {
+                    result.addAll(nnp.getModels());
+                }
+                if (nnn != null) {
+                    result.addAll(nnn.getModels());
+                }
+            } else {
+                result.add(new BarebonesModel(getLeafTriangles()));
+            }
+        }
+        return result;
+    }
+
+    protected List<Float3Vector> getLeafTriangles() {
+        List<Float3Vector> result = new ArrayList<Float3Vector>();
+        if (subdivided) {
+            if (ppp != null) {
+                result.addAll(ppp.getLeafTriangles());
+            }
+            if (ppn != null) {
+                result.addAll(ppn.getLeafTriangles());
+            }
+            if (pnp != null) {
+                result.addAll(pnp.getLeafTriangles());
+            }
+            if (pnn != null) {
+                result.addAll(pnn.getLeafTriangles());
+            }
+            if (npp != null) {
+                result.addAll(npp.getLeafTriangles());
+            }
+            if (npn != null) {
+                result.addAll(npn.getLeafTriangles());
+            }
+            if (nnp != null) {
+                result.addAll(nnp.getLeafTriangles());
+            }
+            if (nnn != null) {
+                result.addAll(nnn.getLeafTriangles());
+            }
+        } else {
+            // Bottom
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+
+            // Top
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+
+            // Left
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+
+            // Right
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+
+            // Front
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    + childRibSize));
+
+            // Back
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+
+            result.add(new Float3Vector(center.getX() - childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() + childRibSize, center.getZ()
+                    - childRibSize));
+            result.add(new Float3Vector(center.getX() + childRibSize, center.getY() - childRibSize, center.getZ()
+                    - childRibSize));
+        }
+        return result;
+    }
+
     protected Float4Vector getColor() {
         if (drawable) {
             return color;
         } else {
             return new Float4Vector();
         }
+    }
+
+    protected Float3Vector getCenter() {
+        return center;
     }
 
     protected int getNumPoints() {
@@ -419,25 +639,26 @@ public class OctreeNode {
             draw_sorted(gl, program, cameraPosition);
         } else {
             if (drawable) {
-                program.setUniformMatrix("TMatrix", TMatrix);
-                program.setUniformMatrix("SMatrix", FloatMatrixMath.scale(scale));
-                program.setUniformVector("Color", color);
-
-                program.use(gl);
-
-                model.draw(gl, program);
-
-                // try {
+                // program.setUniformMatrix("TMatrix", TMatrix);
+                // program.setUniformMatrix("SMatrix",
+                // FloatMatrixMath.scale(scale));
+                // program.setUniformVector("Color", color);
+                //
                 // program.use(gl);
-                // } catch (UninitializedException e) {
-                // logger.error(e.getMessage());
-                // }
                 //
-                // getVbo().bind(gl);
-                //
-                // program.linkAttribs(gl, getVbo().getAttribs());
-                //
-                // gl.glDrawArrays(GL3.GL_POINTS, 0, getNumVertices());
+                // model.draw(gl, program);
+
+                try {
+                    program.use(gl);
+                } catch (UninitializedException e) {
+                    logger.error(e.getMessage());
+                }
+
+                vbo.bind(gl);
+
+                program.linkAttribs(gl, vbo.getAttribs());
+
+                gl.glDrawArrays(GL3.GL_POINTS, 0, numVertices);
             }
         }
         // } else {

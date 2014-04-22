@@ -1,6 +1,7 @@
 package nl.esciencecenter.neon.examples.viaAppia;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,7 +16,6 @@ import nl.esciencecenter.neon.datastructures.FrameBufferObject;
 import nl.esciencecenter.neon.datastructures.IntPixelBufferObject;
 import nl.esciencecenter.neon.examples.viaAppia.las.BoundingBox;
 import nl.esciencecenter.neon.examples.viaAppia.las.LASFile;
-import nl.esciencecenter.neon.examples.viaAppia.las.LASPointCloudModel;
 import nl.esciencecenter.neon.examples.viaAppia.las.LASPublicHeader;
 import nl.esciencecenter.neon.exceptions.UninitializedException;
 import nl.esciencecenter.neon.input.InputHandler;
@@ -70,7 +70,7 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
     // private ScatBuilder scatBuilder;
     // private ScatterPlot3D scat;
-    private List<LASPointCloudModel>   pcModels;
+    // private List<LASPointCloudModel> pcModels;
 
     // Global (singleton) settings instance.
     private final ViaAppiaSettings     settings         = ViaAppiaSettings.getInstance();
@@ -110,9 +110,11 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
     private boolean                    colorless        = false;
 
-    private OctreeNode                 root;
-    private BoxModel                   baseBox;
+    private List<OctreeNode>           roots;
+    // private BoxModel baseBox;
     private Frustum                    frustum;
+
+    // private List<BarebonesModel> bbModels;
 
     /**
      * Basic constructor for ESightExampleGLEventListener.
@@ -168,8 +170,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         gl.glCullFace(GL3.GL_BACK);
 
         // Enable Blending (needed for both Transparency and Anti-Aliasing)
-        // gl.glBlendFunc(GL3.GL_SRC_ALPHA, GL3.GL_ONE_MINUS_SRC_ALPHA);
-        // gl.glEnable(GL3.GL_BLEND);
+        gl.glBlendFunc(GL3.GL_SRC_ALPHA, GL3.GL_ONE_MINUS_SRC_ALPHA);
+        gl.glEnable(GL3.GL_BLEND);
 
         // Enable Vertical Sync
         gl.setSwapInterval(1);
@@ -205,8 +207,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
             pointCloudShaderColorlessProgram = getLoader().createProgram(gl, "lasFileColorless",
                     new File("shaders/vs_lasFileShaderColorless.vp"), new File("shaders/fs_lasFileShader.fp"));
 
-            octreeShaderProgram = getLoader().createProgram(gl, "octree", new File("shaders/vs_octree.vp"),
-                    new File("shaders/fs_octree.fp"));
+            octreeShaderProgram = getLoader().createProgram(gl, "octree", new File("shaders/vs_bare.vp"),
+                    new File("shaders/fs_bare.fp"));
 
             // Same for the postprocessing shader.
             // postprocessShader = getLoader().createProgram(gl, "postProcess",
@@ -242,8 +244,8 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         // scatBuilder = new ScatBuilder();
         // new Thread(scatBuilder).start();
 
-        baseBox = new BoxModel();
-        baseBox.init(gl);
+        // baseBox = new BoxModel();
+        // baseBox.init(gl);
 
         reloadData(gl);
 
@@ -416,13 +418,13 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
     }
 
     private void reloadData(GL3 gl) {
-        if (pcModels != null) {
-            for (LASPointCloudModel currentModel : pcModels) {
-                currentModel.delete(gl);
-            }
-        }
-
-        pcModels = new ArrayList<LASPointCloudModel>();
+        // if (pcModels != null) {
+        // for (LASPointCloudModel currentModel : pcModels) {
+        // currentModel.delete(gl);
+        // }
+        // }
+        //
+        // pcModels = new ArrayList<LASPointCloudModel>();
 
         double minMinX = Double.MAX_VALUE;
         double minMinY = Double.MAX_VALUE;
@@ -493,11 +495,30 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         System.out.println("Number of records: " + totalRecords);
         System.out.println("Skipping         : " + skip);
 
-        root = new OctreeNode(baseBox, 0, new Float3Vector(-1f, -1f, -1f), 2f);
+        roots = new ArrayList<OctreeNode>();
+        // bbModels = new ArrayList<BarebonesModel>();
         for (LASFile lasFile : lasFiles) {
-            lasFile.readPointsToOctree(root, overallBoundingBox);
+            PPOctreeNode ppRoot = new PPOctreeNode("D:/Via Appia/", 0, new Float3Vector(-1f, -1f, -1f), 2f);
+            // OctreeNode root = new OctreeNode(0, new Float3Vector(-1f, -1f,
+            // -1f), 2f);
+            // roots.add(root);
+            lasFile.readPointsToOctree(ppRoot, overallBoundingBox);
+            try {
+                ppRoot.finalizeAdding(gl);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            // root.finalizeAdding(gl);
+            System.out.println("Leaves in octree: " + ppRoot.getNumLeaves());
+
+            // bbModels.addAll(root.getModels());
+            // for (BarebonesModel bbModel : bbModels) {
+            // bbModel.init(gl);
+            // }
         }
-        root.finalizeAdding(gl);
+
+        // List<Float3Vector> triangles = root.getLeafTriangles();
 
         // for (LASFile lasFile : lasFiles) {
         // LASPointCloudModel currentModel = new LASPointCloudModel(lasFile,
@@ -568,19 +589,27 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
 
             octreeShaderProgram.setUniformMatrix("MVMatrix", mv);
             octreeShaderProgram.setUniformMatrix("PMatrix", makePerspectiveMatrix());
-            octreeShaderProgram.setUniformVector("cameraPos", inputHandler.getCameraPosition());
-            octreeShaderProgram.setUniform("hue", settings.getHueFactor());
-            octreeShaderProgram.setUniform("saturation", settings.getSaturationFactor());
+            // octreeShaderProgram.setUniformVector("cameraPos",
+            // inputHandler.getCameraPosition());
+            // octreeShaderProgram.setUniform("hue", settings.getHueFactor());
+            // octreeShaderProgram.setUniform("saturation",
+            // settings.getSaturationFactor());
 
-            root.draw(gl, octreeShaderProgram, cameraPosition);
-
-            // if (colorless) {
-            // renderPointCloud(gl, new Float4Matrix(mv),
-            // pointCloudShaderColorlessProgram);
-            // } else {
-            // renderPointCloud(gl, new Float4Matrix(mv),
-            // pointCloudShaderProgram);
+            // root.draw(gl, octreeShaderProgram, cameraPosition);
+            // octreeShaderProgram.setUniformMatrix("SMatrix",
+            // FloatMatrixMath.scale(1f));
+            // octreeShaderProgram.setUniformVector("Color", new
+            // Float4Vector(0f, 0f, 0f, 1f));
+            //
+            // for (BarebonesModel bbModel : bbModels) {
+            // bbModel.draw(gl, octreeShaderProgram);
             // }
+
+            if (colorless) {
+                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderColorlessProgram);
+            } else {
+                renderPointCloud(gl, new Float4Matrix(mv), pointCloudShaderProgram);
+            }
 
             // drawGlobe(gl, lineShaderProgram);
 
@@ -746,9 +775,13 @@ public class ViaAppiaGLEventListener extends NeonGLEventListener {
         Float3Vector cameraPosition = inputHandler.getCameraPosition();
         program.setUniformVector("cameraPos", cameraPosition);
 
-        for (LASPointCloudModel model : pcModels) {
-            model.draw(gl, program);
+        for (OctreeNode node : roots) {
+            node.draw(gl, program, cameraPosition);
         }
+
+        // for (LASPointCloudModel model : pcModels) {
+        // model.draw(gl, program);
+        // }
     }
 
     // The reshape method is automatically called by the openGL animator if the

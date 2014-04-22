@@ -46,22 +46,22 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
     }
 
     /** Initial value for the rotation in the X direction */
-    private final float rotationXorigin = 0;
+    private final float        rotationXorigin = 0;
 
     /** Initial value for the rotation in the Y direction */
-    private final float rotationYorigin = 0;
+    private final float        rotationYorigin = 0;
 
     /** Mouse drag start point in X direction */
-    private float dragXorigin;
+    private float              dragXorigin;
 
     /** Mouse drag start point in Y direction */
-    private float dragYorigin;
+    private float              dragYorigin;
 
-    private float cameraAngleH = 0f;
-    private float cameraAngleV = 0f;
+    private float              cameraAngleH    = 0f;
+    private float              cameraAngleV    = 0f;
 
     private final Float3Vector cameraDirection = new Float3Vector(0f, 0f, -1f);
-    private final Float3Vector cameraPosition = new Float3Vector(0f, 0.1f, 1.5f);
+    private final Float3Vector cameraPosition  = new Float3Vector(0f, 0.1f, 5f);
 
     private ViaAppiaInputHandler() {
         reset();
@@ -70,10 +70,10 @@ public class ViaAppiaInputHandler extends InputHandler implements MouseListener,
     private void reset() {
     }
 
-    float deltaAngleX = 0f;
-    float deltaAngleY = 0f;
+    float                   deltaAngleX = 0f;
+    float                   deltaAngleY = 0f;
 
-    private final boolean[] keyStates = new boolean[Short.MAX_VALUE];
+    private final boolean[] keyStates   = new boolean[Short.MAX_VALUE];
 
     @Override
     public void mousePressed(MouseEvent e) {
